@@ -7,6 +7,13 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 MODELS_DIR = PROJECT_ROOT / "models"
 
+# Make sure directories exist
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
+PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+
 TARGET_COLUMN = "target"
 
 NUMERIC_FEATURES = [
@@ -28,3 +35,9 @@ CATEGORICAL_FEATURES = [
     "thal",
     "site",
 ]
+
+RANDOM_STATE = 42
+TEST_SIZE = 0.2
+
+MODEL_TYPE = "logreg"  # or "random_forest"
+

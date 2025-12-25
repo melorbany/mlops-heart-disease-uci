@@ -1,0 +1,36 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments (Virtual environments)
+.venv/
+venv/
+env/
+bin/
+lib/
+include/
+
+# Data and Artifacts (NEVER track raw data or large models)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+models/*.pkl
+models/*.joblib
+models/*.h5
+
+# Environment variables (Secrets)
+.env
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# IDEs
+.vscode/
+.idea/
+
+# Experiment Tracking (MLflow/Logs)
+mlruns/
+logs/
