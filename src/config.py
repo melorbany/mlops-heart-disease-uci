@@ -13,6 +13,8 @@ RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
 PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
+FINAL_MODEL_PATH = MODELS_DIR / "final_model.pkl"
+
 
 TARGET_COLUMN = "target"
 
