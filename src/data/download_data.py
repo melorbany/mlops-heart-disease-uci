@@ -1,30 +1,81 @@
+# src/data/download_data.py
+
 """
-Download or place the Heart Disease UCI dataset.
+Download the *processed* Heart Disease files directly into data/raw.
 
-For now, this script just documents the dataset source and expects you
-to manually download and place 'heart.csv' in data/raw.
+We download:
+  - Processed.cleveland.data
+  - Processed.hungarian.data
+  - Processed.switzerland.data
+  - Processed.va.data
 
-You can extend this to programmatically download from a URL if available.
+These are the preprocessed numeric versions (with -9 as missing) that some
+courses and repositories use, instead of the original raw UCI 76-column files.
 """
 
 import argparse
 from pathlib import Path
-from src.config import RAW_DATA_PATH
+from typing import Dict
 
-SOURCE_URL = "https://archive.ics.uci.edu/dataset/45/heart+disease"
+import requests
 
-def main(output: Path):
-    print("Please download the Heart Disease dataset from:")
-    print(SOURCE_URL)
-    print(f"Then save the CSV as: {output}")
-    print("You can rename the downloaded file to 'heart.csv'.")
-    if not output.exists():
-        print(f"[INFO] Currently, file does not exist at {output}.")
-    else:
-        print(f"[OK] Found existing file at {output}.")
+from src.config import RAW_DATA_DIR
+
+
+# Base URL where the processed files are hosted.
+# This is the original UCI "processed" directory:
+# https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/
+UCI_PROCESSED_BASE = (
+    "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease"
+)
+
+PROCESSED_FILES: Dict[str, str] = {
+    "processed.cleveland.data": "processed.cleveland.data",
+    "processed.hungarian.data": "processed.hungarian.data",
+    "processed.switzerland.data": "processed.switzerland.data",
+    "processed.va.data": "processed.va.data",
+}
+
+
+def download_file(url: str, dest: Path) -> None:
+    if dest.exists():
+        print(f"[INFO] File already exists, skipping download: {dest.name}")
+        return
+
+    print(f"[INFO] Downloading {dest.name} from {url}")
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(resp.content)
+
+    print(f"[OK] Downloaded to {dest}")
+
+
+def download_all_raw_files(raw_dir: Path) -> None:
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    for remote_name, local_name in PROCESSED_FILES.items():
+        url = f"{UCI_PROCESSED_BASE}/{remote_name}"
+        dest = raw_dir / local_name
+        download_file(url, dest)
+
+
+def main(raw_dir: Path) -> None:
+    print("Heart Disease UCI - PROCESSED numeric files")
+    print("Source:", "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/")
+    print(f"[INFO] Using raw data directory: {raw_dir}")
+    download_all_raw_files(raw_dir)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=str, default=str(RAW_DATA_PATH))
+    parser.add_argument(
+        "--raw-dir",
+        type=str,
+        default=str(RAW_DATA_DIR),
+        help="Directory to store raw processed .data files (default: RAW_DATA_DIR)",
+    )
     args = parser.parse_args()
-    main(Path(args.output))
+
+    main(Path(args.raw_dir))
