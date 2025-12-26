@@ -1,0 +1,20 @@
+{
+    "logreg": {
+        "logreg_accuracy": 0.842391304347826,
+        "logreg_precision": 0.8476190476190476,
+        "logreg_recall": 0.8725490196078431,
+        "logreg_f1": 0.8599033816425121,
+        "logreg_roc_auc": 0.9085365853658536,
+        "logreg_cv_roc_auc_mean": 0.8850330628921416,
+        "logreg_cv_roc_auc_std": 0.022231951469713837
+    },
+    "rf": {
+        "rf_accuracy": 0.8478260869565217,
+        "rf_precision": 0.8425925925925926,
+        "rf_recall": 0.8921568627450981,
+        "rf_f1": 0.8666666666666667,
+        "rf_roc_auc": 0.9239598278335724,
+        "rf_cv_roc_auc_mean": 0.8796869115026297,
+        "rf_cv_roc_auc_std": 0.024205130130357678
+    }
+}

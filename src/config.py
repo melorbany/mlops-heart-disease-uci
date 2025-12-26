@@ -1,20 +1,31 @@
 from pathlib import Path
 
 # Base directories
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = PROJECT_ROOT / "data"
+BASE_DIR = Path(__file__).resolve().parents[1]
+DATA_DIR = BASE_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
-MODELS_DIR = PROJECT_ROOT / "models"
+MODELS_DIR = BASE_DIR / "models"
+ARTIFACTS_DIR = BASE_DIR / "artifacts"
+MLFLOW_DIR = BASE_DIR / "mlflow"
 
-# Make sure directories exist
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
-PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
-MODELS_DIR.mkdir(parents=True, exist_ok=True)
+# Create directories if not exist
+for p in [
+    DATA_DIR,
+    RAW_DATA_DIR,
+    PROCESSED_DATA_DIR,
+    MODELS_DIR,
+    ARTIFACTS_DIR,
+    MLFLOW_DIR,
+]:
+    p.mkdir(parents=True, exist_ok=True)
+
+# MLflow
+MLFLOW_TRACKING_URI = f"sqlite:///{MLFLOW_DIR / 'mlflow.db'}"
+MLFLOW_EXPERIMENT_NAME = "heart-disease-classification"
+
 
 FINAL_MODEL_PATH = MODELS_DIR / "final_model.pkl"
-
 
 TARGET_COLUMN = "target"
 
