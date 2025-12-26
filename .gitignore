@@ -19,6 +19,7 @@ data/processed/*
 models/*.pkl
 models/*.joblib
 models/*.h5
+artifacts/*
 
 # Environment variables (Secrets)
 .env
@@ -33,4 +34,5 @@ models/*.h5
 
 # Experiment Tracking (MLflow/Logs)
 mlruns/
+mlflow/
 logs/
