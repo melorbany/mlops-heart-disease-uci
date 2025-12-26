@@ -24,7 +24,8 @@ for p in [
 MLFLOW_TRACKING_URI = f"sqlite:///{MLFLOW_DIR / 'mlflow.db'}"
 MLFLOW_EXPERIMENT_NAME = "heart-disease-classification"
 
-
+RAW_DATA_PATH = RAW_DATA_DIR / "heart.csv"
+PROCESSED_DATA_PATH = PROCESSED_DATA_DIR / "heart_clean.csv"
 FINAL_MODEL_PATH = MODELS_DIR / "final_model.pkl"
 
 TARGET_COLUMN = "target"

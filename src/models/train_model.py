@@ -2,6 +2,9 @@ import argparse
 import json
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")  # Use non‑interactive backend, avoids Tk / GUI issues
+
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,8 +22,14 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
-from src.config import PROCESSED_DATA_DIR, FINAL_MODEL_PATH, ARTIFACTS_DIR,RANDOM_STATE,TEST_SIZE
 
+from src.config import (
+    PROCESSED_DATA_PATH,
+    FINAL_MODEL_PATH,
+    ARTIFACTS_DIR,
+    RANDOM_STATE,
+    TEST_SIZE,
+)
 from src.features.build_features import split_features_target, build_preprocessor
 from src.models.mlflow_utils import start_run, log_params, log_metrics, log_artifact
 
@@ -57,7 +66,7 @@ def evaluate_model(model, X_test, y_test, prefix: str, artifact_dir: Path):
 def main(random_state: int = RANDOM_STATE, test_size: float = TEST_SIZE):
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    df = pd.read_csv(PROCESSED_DATA_DIR / "heart_clean.csv", na_values='?')
+    df = pd.read_csv(PROCESSED_DATA_PATH, na_values="?")
     X, y = split_features_target(df)
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -82,37 +91,56 @@ def main(random_state: int = RANDOM_STATE, test_size: float = TEST_SIZE):
     best_model = None
 
     for name, clf in models.items():
-        pipeline = Pipeline(steps=[
-            ("preprocessor", preprocessor),
-            ("clf", clf),
-        ])
+        pipeline = Pipeline(
+            steps=[
+                ("preprocessor", preprocessor),
+                ("clf", clf),
+            ]
+        )
 
         with start_run(run_name=name):
-            log_params({
-                "model_name": name,
-                "random_state": random_state,
-                "test_size": test_size,
-                **clf.get_params()
-            })
-
-            # Cross-validation ROC-AUC
-            cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
-            cv_scores = cross_val_score(
-                pipeline, X_train, y_train, cv=cv, scoring="roc_auc"
+            log_params(
+                {
+                    "model_name": name,
+                    "random_state": random_state,
+                    "test_size": test_size,
+                    **clf.get_params(),
+                }
             )
-            cv_mean = float(np.mean(cv_scores))
-            cv_std = float(np.std(cv_scores))
 
-            pipeline.fit(X_train, y_train)
+            # ---- Robust cross-validation ----
+            n_samples = len(X_train)
+            # Cap at 5 folds, but cannot exceed number of training samples
+            n_splits = min(5, n_samples)
+
+            if n_splits <= 2:
+                # Not enough data for CV; skip CV and just fit once
+                cv_scores = None
+                cv_mean = None
+                cv_std = None
+                pipeline.fit(X_train, y_train)
+            else:
+                cv = StratifiedKFold(
+                    n_splits=n_splits, shuffle=True, random_state=random_state
+                )
+                cv_scores = cross_val_score(
+                    pipeline, X_train, y_train, cv=cv, scoring="roc_auc"
+                )
+                cv_mean = float(np.mean(cv_scores))
+                cv_std = float(np.std(cv_scores))
+
+                pipeline.fit(X_train, y_train)
 
             # Evaluate
             metrics, cm_path, roc_path = evaluate_model(
                 pipeline, X_test, y_test, prefix=name, artifact_dir=ARTIFACTS_DIR
             )
 
-            # Add CV metrics
-            metrics[f"{name}_cv_roc_auc_mean"] = cv_mean
-            metrics[f"{name}_cv_roc_auc_std"] = cv_std
+            # Add CV metrics if available
+            if cv_mean is not None:
+                metrics[f"{name}_cv_roc_auc_mean"] = cv_mean
+            if cv_std is not None:
+                metrics[f"{name}_cv_roc_auc_std"] = cv_std
 
             log_metrics(metrics)
             log_artifact(cm_path)

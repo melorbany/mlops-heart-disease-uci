@@ -49,7 +49,8 @@ async def health():
 async def predict(features: HeartFeatures):
     metrics["total_requests"] += 1
 
-    result = model_service.predict_single(features.dict())
+    # Predict single
+    result = model_service.predict_single(features.model_dump())
 
     metrics["total_predictions"] += 1
     if result["prediction"] == 1:
