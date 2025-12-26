@@ -8,6 +8,7 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 MODELS_DIR = BASE_DIR / "models"
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 MLFLOW_DIR = BASE_DIR / "mlflow"
+MLRUN_DIR = BASE_DIR / "mlrun"  
 
 # Create directories if not exist
 for p in [
