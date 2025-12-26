@@ -24,9 +24,8 @@ COLUMNS = [
 ]
 
 
-def load_processed_file(path: Path, site_name: str) -> pd.DataFrame:
+def load_processed_file(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path, header=None, names=COLUMNS)
-    df["site"] = site_name
     return df
 
 
@@ -37,7 +36,7 @@ def convert_all(inputs: List[Path], site_names: List[str], output_path: Path):
             print(f"[WARN] missing file, skipping: {p}")
             continue
         print(f"[INFO] loading {p} as site='{site}'")
-        dfs.append(load_processed_file(p, site))
+        dfs.append(load_processed_file(p))
 
     if not dfs:
         raise FileNotFoundError("No processed.*.data files found.")
@@ -53,7 +52,6 @@ def convert_all(inputs: List[Path], site_names: List[str], output_path: Path):
 
     print(f"[OK] saved merged CSV to {output_path}")
     print(f"     shape: {df.shape}")
-    print("     sites:\n", df["site"].value_counts())
 
 
 def main():

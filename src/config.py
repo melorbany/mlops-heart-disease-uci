@@ -35,7 +35,6 @@ CATEGORICAL_FEATURES = [
     "slope",
     "ca",
     "thal",
-    "site",
 ]
 
 RANDOM_STATE = 42
