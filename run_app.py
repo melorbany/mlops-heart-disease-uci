@@ -1,12 +1,21 @@
 # run_app.py
+import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 # Import paths from your config module
 from src.config import BASE_DIR, DATA_DIR, ARTIFACTS_DIR, MLFLOW_DIR, MODELS_DIR, MLRUN_DIR
 
+def is_running_in_docker() -> bool:
+    """
+    Heuristic to detect Docker.
+    You can also rely solely on an explicit env var if you prefer.
+    """
+    if os.environ.get("RUN_IN_DOCKER") == "1":
+        return True
+    # Fallback heuristics: presence of /.dockerenv, etc.
+    return os.path.exists("/.dockerenv")
 
 
 def clean_directories() -> None:
@@ -48,6 +57,9 @@ def run(cmd: str) -> None:
 def main() -> None:
     print("=== MLOps Heart Disease pipeline + API launcher ===")
 
+    in_docker = is_running_in_docker()
+    print(f"Running in Docker: {in_docker}")
+
     # 0. Clean previous outputs
     print("\n[Step 0/5] Cleaning previous data...")
     clean_directories()
@@ -70,7 +82,14 @@ def main() -> None:
 
     # 5. Start FastAPI app with uvicorn
     print("\n[Step 5/5] Starting API server with uvicorn...")
-    run("uvicorn src.api.main:app --reload")
+    if in_docker:
+        # Inside Docker: no reload, listen on all interfaces, port 8000
+        uvicorn_cmd = "uvicorn src.api.main:app --host 0.0.0.0 --port 8000"
+    else:
+        # Local dev: keep reload for convenience
+        uvicorn_cmd = "uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000"
+
+    run(uvicorn_cmd)
 
     # Execution remains here while uvicorn is running
 
