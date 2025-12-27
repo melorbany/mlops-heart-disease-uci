@@ -1,0 +1,143 @@
+name: CI - Lint, Test, Docker Validate
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  PYTHON_VERSION: "3.13"
+  DOCKER_IMAGE: "${{ vars.DOCKERHUB_USERNAME }}/heart-predict-api"
+  APP_CONTAINER_NAME: "heart-predict-api"
+
+jobs:
+  setup:
+    name: Checkout and Install Dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff pytest
+
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff pytest
+
+      - name: Run ruff
+        run: ruff check .
+
+  test:
+    name: Testing
+    runs-on: ubuntu-latest
+    needs: [setup, lint]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff pytest
+
+      - name: Run pytest
+        run: pytest
+
+  docker-validate:
+    name: Docker Build & Validate /health (Local)
+    runs-on: ubuntu-latest
+    needs: [test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set Docker image name
+        id: image-name
+        run: |
+          if [ -n "${{ env.DOCKER_IMAGE }}" ]; then
+            echo "IMAGE=${{ env.DOCKER_IMAGE }}" >> $GITHUB_OUTPUT
+          else
+            echo "IMAGE=${{ env.DOCKER_IMAGE }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Docker image (candidate)
+        run: |
+          docker build \
+            -f docker/Dockerfile \
+            -t ${{ steps.image-name.outputs.IMAGE }}:candidate \
+            .
+
+      - name: Run container for validation
+        run: |
+          docker stop ${{ env.APP_CONTAINER_NAME }} || true
+          docker rm ${{ env.APP_CONTAINER_NAME }} || true
+
+          docker run -d \
+            --name ${{ env.APP_CONTAINER_NAME }} \
+            -p 8000:8000 \
+            ${{ steps.image-name.outputs.IMAGE }}:candidate
+
+          echo "Container started, waiting for app to be ready..."
+          sleep 20
+
+      - name: Validate /health endpoint
+        run: |
+          echo "Calling http://127.0.0.1:8000/health"
+          curl --fail --max-time 30 http://127.0.0.1:8000/health | tee health_response.json
+
+          if command -v jq >/dev/null 2>&1; then
+            status=$(jq -r '.status' health_response.json)
+            if [ "$status" != "ok" ]; then
+              echo "Expected status=ok but got: $status"
+              exit 1
+            fi
+          else
+            if ! grep -q '"status"' health_response.json || ! grep -q '"ok"' health_response.json; then
+              echo "Response does not contain expected status=ok"
+              cat health_response.json
+              exit 1
+            fi
+          fi
+
+          echo "Local container health check passed."
+
+      - name: Stop and remove validation container
+        if: always()
+        run: |
+          docker stop ${{ env.APP_CONTAINER_NAME }} || true
+          docker rm ${{ env.APP_CONTAINER_NAME }} || true
