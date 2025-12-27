@@ -11,7 +11,13 @@ from src.models.predict_model import HeartDiseaseModelService
 logger = logging.getLogger("heart_api")
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="Heart Disease Prediction API", version="1.0.0")
+app = FastAPI(
+    title="Heart Disease Prediction API",
+    version="1.0.0",
+    docs_url="/",            # Swagger UI at root
+    redoc_url=None,          # optional: disable ReDoc
+    openapi_url="/openapi.json",
+)
 
 model_service = HeartDiseaseModelService()
 
@@ -35,10 +41,6 @@ async def log_requests(request: Request, call_next):
     )
     return response
 
-
-@app.get("/")
-def home():
-    return {"message": "Welcome to Heart Disease Prediction API.","created_by":"Group 5"}
 
 @app.get("/health")
 async def health():

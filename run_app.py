@@ -33,10 +33,16 @@ def clean_directories() -> None:
 def run(cmd: str) -> None:
     """Run a shell command, printing it first and exiting on failure."""
     print(f"\n>>> Running command: {cmd}")
-    result = subprocess.run(cmd, shell=True)
+    try:
+        result = subprocess.run(cmd, shell=True)
+    except KeyboardInterrupt:
+        # User pressed Ctrl+C while this command was running
+        print("\n!!! Execution interrupted by user. Exiting.")
+        sys.exit(130)  # 130 is the conventional exit code for SIGINT
     if result.returncode != 0:
         print(f"!!! Command failed with exit code {result.returncode}: {cmd}")
         sys.exit(result.returncode)
+
 
 
 def main() -> None:
@@ -70,4 +76,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        # Catch any stray Ctrl+C not caught inside run()
+        print("\nScript interrupted by user.")
+        sys.exit(130)
