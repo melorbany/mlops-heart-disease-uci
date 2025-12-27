@@ -1,8 +1,8 @@
-# run_app.py
 import os
 import shutil
 import subprocess
 import sys
+from argparse import ArgumentParser
 
 # Import paths from your config module
 from src.config import (
@@ -60,11 +60,24 @@ def run(cmd: str) -> None:
         sys.exit(result.returncode)
 
 
+def parse_args():
+    parser = ArgumentParser(description="MLOps Heart Disease pipeline + API launcher")
+    parser.add_argument(
+        "--no-api",
+        action="store_true",
+        help="Run the data + training pipeline only (steps 0–4) and skip starting the API server.",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
+
     print("=== MLOps Heart Disease pipeline + API launcher ===")
 
     in_docker = is_running_in_docker()
     print(f"Running in Docker: {in_docker}")
+    print(f"Skip API step: {args.no_api}")
 
     # 0. Clean previous outputs
     print("\n[Step 0/5] Cleaning previous data...")
@@ -79,14 +92,18 @@ def main() -> None:
     run("python -m src.data.convert_uci_to_csv")
 
     # 3. Preprocess CSV files
-    print("\n[Step 3/5] Converting UCI data to CSV...")
+    print("\n[Step 3/5] Preprocessing CSV files...")
     run("python -m src.data.preprocess")
 
     # 4. Train model
     print("\n[Step 4/5] Training model...")
     run("python -m src.models.train_model")
 
-    # 5. Start FastAPI app with uvicorn
+    # 5. Start FastAPI app with uvicorn (optional)
+    if args.no_api:
+        print("\n[Step 5/5] Skipped (no-api mode).")
+        return
+
     print("\n[Step 5/5] Starting API server with uvicorn...")
     if in_docker:
         # Inside Docker: no reload, listen on all interfaces, port 8000
@@ -96,7 +113,6 @@ def main() -> None:
         uvicorn_cmd = "uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000"
 
     run(uvicorn_cmd)
-
     # Execution remains here while uvicorn is running
 
 
