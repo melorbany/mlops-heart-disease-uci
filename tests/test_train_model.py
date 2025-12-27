@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -143,9 +142,19 @@ def test_train_model_uses_mlflow_utils(tmp_path, monkeypatch, tiny_processed_df)
 
     # Assert MLflow-like utilities were called
     # We expect at least one run for each model: 'logreg' and 'rf'
-    assert any("logreg" == name for name in start_run_calls), "start_run not called for 'logreg'."
-    assert any("rf" == name for name in start_run_calls), "start_run not called for 'rf'."
+    assert any("logreg" == name for name in start_run_calls), (
+        "start_run not called for 'logreg'."
+    )
+    assert any("rf" == name for name in start_run_calls), (
+        "start_run not called for 'rf'."
+    )
 
-    assert len(log_params_calls) >= 2, "log_params should be called at least once per model."
-    assert len(log_metrics_calls) >= 2, "log_metrics should be called at least once per model."
-    assert len(log_artifact_calls) >= 4, "log_artifact should be called for multiple plots."
+    assert len(log_params_calls) >= 2, (
+        "log_params should be called at least once per model."
+    )
+    assert len(log_metrics_calls) >= 2, (
+        "log_metrics should be called at least once per model."
+    )
+    assert len(log_artifact_calls) >= 4, (
+        "log_artifact should be called for multiple plots."
+    )

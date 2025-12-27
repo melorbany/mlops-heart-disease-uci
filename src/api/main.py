@@ -14,8 +14,8 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(
     title="Heart Disease Prediction API",
     version="1.0.0",
-    docs_url="/",            # Swagger UI at root
-    redoc_url=None,          # optional: disable ReDoc
+    docs_url="/",  # Swagger UI at root
+    redoc_url=None,  # optional: disable ReDoc
     openapi_url="/openapi.json",
 )
 

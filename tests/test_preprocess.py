@@ -1,4 +1,3 @@
-from pathlib import Path
 
 import pandas as pd
 
@@ -8,12 +7,14 @@ from src.config import TARGET_COLUMN
 
 def test_clean_data():
     # Create small dummy dataframe with missing values
-    df = pd.DataFrame({
-        "age": [63, None, 45],
-        "sex": [1, 0, None],
-        "cp": [3, 2, 1],
-        TARGET_COLUMN: [1, 0, 1],
-    })
+    df = pd.DataFrame(
+        {
+            "age": [63, None, 45],
+            "sex": [1, 0, None],
+            "cp": [3, 2, 1],
+            TARGET_COLUMN: [1, 0, 1],
+        }
+    )
 
     df_clean = clean_data(df)
 

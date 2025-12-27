@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Dict, Any
 
 import joblib
-import numpy as np
 import pandas as pd
 
 from src.config import FINAL_MODEL_PATH

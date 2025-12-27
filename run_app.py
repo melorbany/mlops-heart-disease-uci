@@ -5,7 +5,14 @@ import subprocess
 import sys
 
 # Import paths from your config module
-from src.config import BASE_DIR, DATA_DIR, ARTIFACTS_DIR, MLFLOW_DIR, MODELS_DIR, MLRUN_DIR
+from src.config import (
+    DATA_DIR,
+    ARTIFACTS_DIR,
+    MLFLOW_DIR,
+    MODELS_DIR,
+    MLRUN_DIR,
+)
+
 
 def is_running_in_docker() -> bool:
     """
@@ -51,7 +58,6 @@ def run(cmd: str) -> None:
     if result.returncode != 0:
         print(f"!!! Command failed with exit code {result.returncode}: {cmd}")
         sys.exit(result.returncode)
-
 
 
 def main() -> None:

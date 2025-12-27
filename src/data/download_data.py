@@ -63,7 +63,10 @@ def download_all_raw_files(raw_dir: Path) -> None:
 
 def main(raw_dir: Path) -> None:
     print("Heart Disease UCI - PROCESSED numeric files")
-    print("Source:", "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/")
+    print(
+        "Source:",
+        "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/",
+    )
     print(f"[INFO] Using raw data directory: {raw_dir}")
     download_all_raw_files(raw_dir)
 

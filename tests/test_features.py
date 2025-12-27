@@ -1,28 +1,30 @@
 import pandas as pd
 from src.features.build_features import build_preprocessor
-from src.config import NUMERIC_FEATURES, CATEGORICAL_FEATURES, TARGET_COLUMN
+from src.config import NUMERIC_FEATURES, TARGET_COLUMN
 
 
 def test_build_preprocessor():
     preprocessor = build_preprocessor()
 
     # Build dummy data
-    df = pd.DataFrame({
-        "age": [63, 45],
-        "trestbps": [145, 130],
-        "chol": [233, 250],
-        "thalach": [150, 140],
-        "oldpeak": [2.3, 1.4],
-        "sex": [1, 0],
-        "cp": [3, 2],
-        "fbs": [1, 0],
-        "restecg": [0, 1],
-        "exang": [0, 1],
-        "slope": [0, 1],
-        "ca": [0, 2],
-        "thal": [1, 2],
-        TARGET_COLUMN: [1, 0],
-    })
+    df = pd.DataFrame(
+        {
+            "age": [63, 45],
+            "trestbps": [145, 130],
+            "chol": [233, 250],
+            "thalach": [150, 140],
+            "oldpeak": [2.3, 1.4],
+            "sex": [1, 0],
+            "cp": [3, 2],
+            "fbs": [1, 0],
+            "restecg": [0, 1],
+            "exang": [0, 1],
+            "slope": [0, 1],
+            "ca": [0, 2],
+            "thal": [1, 2],
+            TARGET_COLUMN: [1, 0],
+        }
+    )
 
     X = df.drop(columns=[TARGET_COLUMN])
     preprocessor.fit(X)
