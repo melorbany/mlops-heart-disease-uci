@@ -36,3 +36,5 @@ artifacts/*
 mlruns/
 mlflow/
 logs/
+coverage.xml
+.coverage
