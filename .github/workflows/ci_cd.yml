@@ -37,7 +37,7 @@ jobs:
       - name: Download data and train model for testing
         run: python -m run_app --no-api
 
-          - name: Run tests with coverage
+      - name: Run tests with coverage
         run: |
           pytest tests/ -v \
             --cov=src \
