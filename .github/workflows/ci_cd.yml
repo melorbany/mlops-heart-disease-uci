@@ -37,16 +37,43 @@ jobs:
       - name: Download data and train model for testing
         run: python -m run_app --no-api
 
-      - name: Run tests with pytest
+          - name: Run tests with coverage
         run: |
-          pytest tests/ -v --cov=src --cov-report=xml --cov-report=html
+          pytest tests/ -v \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=json
+    
+      - name: Generate Coverage Summary
+        run: |
+          echo "## Test Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Extract coverage percentage from coverage.json
+          COVERAGE=$(python -c "import json; print(json.load(open('coverage.json'))['totals']['percent_covered_display'])")
+          
+          echo "**Total Coverage:** ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add coverage table
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Coverage | ${COVERAGE}% |" >> $GITHUB_STEP_SUMMARY
+          
+          # Show detailed report
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Detailed Coverage" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          coverage report >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
       
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+      - name: Upload HTML Coverage Report
+        uses: actions/upload-artifact@v3
         with:
-          files: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
+          name: coverage-html-report
+          path: htmlcov/
 
   train-model:
     name: Train Model
@@ -176,6 +203,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download trained model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: heart-model
+          path: models/
 
       - name: Set Docker image name
         id: image-name
