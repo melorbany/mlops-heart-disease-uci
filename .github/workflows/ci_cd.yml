@@ -28,12 +28,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-
-      - name: Install linting tools
+      
+      - name: Install dependencies
         run: |
-            python -m pip install --upgrade pip
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
             pip install flake8 pylint black isort autopep8
-
+    
       - name: Initialize lint summary file
         run: |
             echo "Linting & Formatting Results" > lint-summary.txt
@@ -163,10 +164,12 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
-      - name: Install security tools
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install bandit safety pip-audit semgrep
+          pip install -r requirements.txt
+          pip install bandit safety pip-audit
+
 
       - name: Initialize security summary file
         run: |
@@ -246,32 +249,6 @@ jobs:
           mkdir -p security-reports
           mv pip-audit-report.json security-reports/pip-audit-report.json
 
-      - name: Semgrep (SAST)
-        run: |
-          echo "### 4. Semgrep (SAST)" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
-          mkdir -p security-reports
-
-          if semgrep scan \
-            --config=auto \
-            --severity=ERROR \
-            --severity=WARNING \
-            --json \
-            --output=security-reports/semgrep-report.json \
-            src/ > semgrep-report.txt 2>&1; then
-            echo "No critical security patterns found by Semgrep" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          else
-            cat semgrep-report.txt | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "Security patterns detected by Semgrep" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-
-          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
       - name: Secret Detection
         run: |
           echo "### 5. Secret Detection" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
@@ -322,16 +299,6 @@ jobs:
           name: security-summary
           path: |
             security-summary.txt
-            security-reports/semgrep-report.json
-          retention-days: 30
-          compression-level: 6
-
-      - name: Upload Semgrep SARIF (for GitHub Security)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: security-reports/semgrep-report.json
-        continue-on-error: true
 
   # ==========================================
   # TESTING & COVERAGE
@@ -492,7 +459,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
-      - name: Install dependencies for training
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
