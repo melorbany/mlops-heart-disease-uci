@@ -475,6 +475,53 @@ jobs:
           name: heart-model
           path: models/
           if-no-files-found: error
+  # ==========================================
+  # MLFLOW REPORT
+  # ==========================================
+  mlflow-report:
+    name: MLflow Report
+    runs-on: ubuntu-latest
+    needs: train-model
+
+    steps:
+      - name: Download MLflow tracking DB
+        uses: actions/download-artifact@v4
+        with:
+          name: mlflow-db
+          path: mlflow-db
+
+      - name: Show MLflow runs in job summary
+        run: |
+          echo "## MLflow Experiment Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          DB_PATH="mlflow-db/mlflow.db"
+
+          if [ ! -f "$DB_PATH" ]; then
+            echo "MLflow DB not found at $DB_PATH" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "Using database: \`$DB_PATH\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### Latest Runs" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Run ID | Experiment ID | Status | Start Time | End Time |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|---------------|--------|-----------|----------|" >> "$GITHUB_STEP_SUMMARY"
+
+          # Query runs table from MLflow DB (SQLite)
+          # Adjust column names if your MLflow version differs.
+          sqlite3 -header -csv "$DB_PATH" "
+            SELECT run_uuid, experiment_id, status, start_time, end_time
+            FROM runs
+            ORDER BY start_time DESC
+            LIMIT 10;
+          " | tail -n +2 | while IFS=',' read -r run_id exp_id status start_time end_time; do
+            echo "| $run_id | $exp_id | $status | $start_time | $end_time |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
   # ==========================================
   # DOCKER BUILD & VALIDATE
