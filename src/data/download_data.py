@@ -24,9 +24,7 @@ from src.config import RAW_DATA_DIR
 # Base URL where the processed files are hosted.
 # This is the original UCI "processed" directory:
 # https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/
-UCI_PROCESSED_BASE = (
-    "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease"
-)
+UCI_PROCESSED_BASE = "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease"
 
 PROCESSED_FILES: Dict[str, str] = {
     "processed.cleveland.data": "processed.cleveland.data",

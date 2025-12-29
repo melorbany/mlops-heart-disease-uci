@@ -35,9 +35,7 @@ def save_clean_data(df: pd.DataFrame, path: Path) -> None:
     df.to_csv(path, index=False)
 
 
-def run_preprocessing(
-    input_path: Path, output_path: Path
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def run_preprocessing(input_path: Path, output_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     df_raw = load_raw_data(input_path)
     df_clean = clean_data(df_raw)
     save_clean_data(df_clean, output_path)

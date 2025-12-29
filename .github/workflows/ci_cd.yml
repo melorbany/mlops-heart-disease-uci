@@ -475,6 +475,13 @@ jobs:
           name: heart-model
           path: models/
           if-no-files-found: error
+      - name: Upload MLflow tracking DB
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-db
+          path: mlflow/mlflow.db         
+          if-no-files-found: error
+          
   # ==========================================
   # MLFLOW REPORT
   # ==========================================

@@ -2,8 +2,8 @@ import argparse
 import json
 from pathlib import Path
 
-import matplotlib
 import joblib
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -120,12 +120,8 @@ def main(random_state: int = RANDOM_STATE, test_size: float = TEST_SIZE):
                 cv_std = None
                 pipeline.fit(X_train, y_train)
             else:
-                cv = StratifiedKFold(
-                    n_splits=n_splits, shuffle=True, random_state=random_state
-                )
-                cv_scores = cross_val_score(
-                    pipeline, X_train, y_train, cv=cv, scoring="roc_auc"
-                )
+                cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+                cv_scores = cross_val_score(pipeline, X_train, y_train, cv=cv, scoring="roc_auc")
                 cv_mean = float(np.mean(cv_scores))
                 cv_std = float(np.std(cv_scores))
 
