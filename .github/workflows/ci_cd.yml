@@ -375,10 +375,10 @@ jobs:
           compression-level: 6
 
   # ==========================================
-  # TRAIN MODEL
+  # DOWNLOAD DATA & PROCESS
   # ==========================================
-  train-model:
-    name: Train Model
+  data:
+    name: Download Dataset & Process
     runs-on: ubuntu-latest
 
     steps:
@@ -400,7 +400,7 @@ jobs:
         run: |
           echo "Cleaning previous data directories..."
           rm -rf data/raw data/processed artifacts models || true
-          mkdir -p data/raw  data/processed artifacts models
+          mkdir -p data/raw data/processed artifacts models
 
       - name: Download dataset
         run: |
@@ -417,8 +417,55 @@ jobs:
           echo "Running: python -m src.data.preprocess"
           python -m src.data.preprocess
 
-      - name: Train model
+      - name: Verify processed dataset
         run: |
+          if [ ! -f "data/processed/heart_clean.csv" ]; then
+            echo "ERROR: data/processed/heart_clean.csv not found after preprocessing."
+            exit 1
+          fi
+
+      - name: Upload processed dataset artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: processed-data
+          path: data/processed/heart_clean.csv
+          if-no-files-found: error
+
+
+  # ==========================================
+  # TRAIN MODEL
+  # ==========================================
+  train-model:
+    name: Train Model
+    runs-on: ubuntu-latest
+    needs: data
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download processed dataset artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: processed-data
+          path: data/processed
+
+      - name: Train model
+        env:
+          PROCESSED_DATA_PATH: data/processed/heart_clean.csv
+        run: |
+          echo "Using processed data at: $PROCESSED_DATA_PATH"
           echo "Running: python -m src.models.train_model"
           python -m src.models.train_model
 
@@ -429,6 +476,9 @@ jobs:
           path: models/
           if-no-files-found: error
 
+  # ==========================================
+  # DOCKER BUILD & VALIDATE
+  # ==========================================
   docker-build:
     name: Docker Build & Validate
     runs-on: ubuntu-latest
@@ -500,6 +550,9 @@ jobs:
           docker stop ${{ env.APP_CONTAINER_NAME }} || true
           docker rm ${{ env.APP_CONTAINER_NAME }} || true  
 
+  # ==========================================
+  # PUSH TO DOCKER HUB
+  # ==========================================
   docker-push:
     name: Push to Docker Hub
     runs-on: ubuntu-latest
@@ -553,6 +606,10 @@ jobs:
           echo "Pushed Docker image:"
           echo "  ${{ steps.image-name.outputs.IMAGE }}:latest"
           echo "  ${{ steps.image-name.outputs.IMAGE }}:${{ steps.short-sha.outputs.SHORT_SHA }}"
+  
+  # ==========================================
+  # DEPLOY TO CLOUD
+  # ==========================================
   cloud-deploy:
     name: Deploy to Cloud
     runs-on: ubuntu-latest
@@ -649,6 +706,9 @@ jobs:
           echo "Deployment on cloud server completed."
           EOF
 
+  # ==========================================
+  # HEALTH CHECK
+  # ==========================================
   health-check:
     name: Health Check
     runs-on: ubuntu-latest
