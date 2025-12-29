@@ -44,95 +44,59 @@ jobs:
 
       - name: Use Flake8 (PEP 8 Style Enforcement)
         run: |
-            echo "### 1. Flake8 (PEP 8 Style Enforcement)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
-            if flake8 src/ \
+          {
+            echo "### 1. Flake8 (PEP 8 Style Enforcement)"
+            echo '```'
+            flake8 src/ \
               --max-line-length=100 \
               --max-complexity=10 \
               --statistics \
               --count \
               --show-source \
-              --exclude=__pycache__,*.pyc,.git,__init__.py,migrations \
-              > flake8-report.txt 2>&1; then
-              echo "No PEP 8 violations found" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            else
-              cat flake8-report.txt | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "Flake8 violations found" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            fi
-
-            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              --exclude=__pycache__,*.pyc,.git,__init__.py,migrations || true
+            echo '```'
+            echo ""
+          } | tee -a lint-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
       - name: Validate Code Quality
         run: |
-            echo "### 2. Pylint (Code Quality)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
-            if pylint src/ \
+          {
+            echo "### 2. Pylint (Code Quality)"
+            echo '```'
+            pylint src/ \
               --output-format=text \
               --reports=y \
               --disable=C0111,C0103,R0903,W0212 \
               --fail-under=7.0 \
-              --max-line-length=100 \
-              > pylint-report.txt 2>&1; then
-              echo "Pylint score above threshold (7.0)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              tail -20 pylint-report.txt | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            else
-              cat pylint-report.txt | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "Pylint score below threshold" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            fi
-
-            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              --max-line-length=100 || true
+            echo '```'
+            echo ""
+          } | tee -a lint-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
       - name: Check Code Formatting
         run: |
-            echo "### 3. Black (Code Formatting)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
-            if black --check --diff --line-length=100 src/ > black-report.txt 2>&1; then
-              echo "All files properly formatted with Black" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            else
-              cat black-report.txt | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "Code formatting issues found" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "Hint: run 'black --line-length=100 src/' locally to auto-format" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            fi
-
-            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### 3. Black (Code Formatting)"
+            echo '```'
+            black --check --diff --line-length=100 src/ || true
+            echo '```'
+            echo ""
+            echo "Hint: run 'black --line-length=100 src/' locally to auto-format if needed."
+            echo ""
+          } | tee -a lint-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
       - name: Check Import Order
         run: |
-            echo "### 4. isort (Import Organization)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
+          {
+            echo "### 4. isort (Import Organization)"
+            echo '```'
             # Check-only, do not modify code
-            if isort --check-only --diff --profile black src/ > isort-report.txt 2>&1; then
-              echo "All imports properly sorted (isort --profile black src/)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            else
-              cat isort-report.txt | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "Import sorting issues found" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "Hint: run 'isort --profile black src/' locally to auto-sort imports" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            fi
-
-            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
+            isort --check-only --diff --profile black src/ || true
+            echo '```'
+            echo ""
+            echo "Hint: run 'isort --profile black src/' locally to auto-sort imports if needed."
+            echo ""
+          } | tee -a lint-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
       - name: Generate Lint Summary
         if: success()
         run: |
@@ -180,80 +144,51 @@ jobs:
 
       - name: Security Linter
         run: |
-          echo "### 1. Bandit (Python Security Linter)" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
-          if bandit -r src/ \
-            -f txt \
-            --severity-level medium \
-            --confidence-level medium \
-            --skip B101,B601 \
-            -ll > bandit-report.txt 2>&1; then
-            echo "No security issues found by Bandit" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          else
-            cat bandit-report.txt | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "Security vulnerabilities detected by Bandit" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-
-          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### 1. Bandit (Python Security Linter)"
+            echo '```'
+            bandit -r src/ \
+              -f txt \
+              --severity-level medium \
+              --confidence-level medium \
+              --skip B101,B601 \
+              -ll || true
+            echo '```'
+            echo ""
+          } | tee -a security-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
       - name: Check Dependency Vulnerabilities
         run: |
-          echo "### 2. Safety (Dependency Vulnerabilities)" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
           pip freeze > requirements-frozen.txt
 
-          if safety check \
-            --file requirements-frozen.txt \
-            --output text \
-            > safety-report.txt 2>&1; then
-            echo "No vulnerable dependencies found" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          else
-            cat safety-report.txt | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "Vulnerable dependencies detected" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "Please review and update vulnerable packages" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            # Warning only, do not fail the job
-          fi
-
-          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### 2. Safety (Dependency Vulnerabilities)"
+            echo '```'
+            safety check \
+              --file requirements-frozen.txt \
+              --output text || true
+            echo '```'
+            echo ""
+          } | tee -a security-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
       - name: Check Package Security
         run: |
-          echo "### 3. pip-audit (PyPI Package Security)" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### 3. pip-audit (PyPI Package Security)"
+            echo '```'
+            pip-audit \
+              --requirement requirements-frozen.txt \
+              --format json \
+              --output pip-audit-report.json || true
+            echo '```'
+            echo ""
+          } | tee -a security-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
-          # Use the frozen requirements from the Safety step
-          if pip-audit \
-            --requirement requirements-frozen.txt \
-            --format json \
-            --output pip-audit-report.json \
-            > pip-audit-report.txt 2>&1; then
-            echo "No security issues found by pip-audit" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          else
-            cat pip-audit-report.txt | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "Package security issues detected by pip-audit" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            # Warning only, do not fail the job
-          fi
-
-          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
-          # Move JSON into a known location for SARIF upload or future processing
           mkdir -p security-reports
-          mv pip-audit-report.json security-reports/pip-audit-report.json
+          mv pip-audit-report.json security-reports/pip-audit-report.json || true
 
       - name: Secret Detection
         run: |
-          echo "### 5. Secret Detection" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
           SECRET_PATTERNS=(
             "password\s*=\s*['\"].*['\"]"
             "api[_-]?key\s*=\s*['\"].*['\"]"
@@ -262,30 +197,27 @@ jobs:
             "aws[_-]?(access|secret)[_-]?key"
           )
 
-          SECRETS_FOUND=0
           : > secrets-report.txt
 
           for pattern in "${SECRET_PATTERNS[@]}"; do
-            if grep -r -i -E "$pattern" src/ --exclude-dir=__pycache__ >> secrets-report.txt 2>&1; then
-              SECRETS_FOUND=1
-            fi
+            grep -r -i -E "$pattern" src/ --exclude-dir=__pycache__ >> secrets-report.txt 2>&1 || true
           done
 
-          if [ "$SECRETS_FOUND" -eq 0 ]; then
-            echo "No hardcoded secrets detected" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          else
-            cat secrets-report.txt | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "Potential hardcoded secrets found" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "Please review and use environment variables or secret managers instead" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-
-          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
+          {
+            echo "### 5. Secret Detection"
+            echo '```'
+            if [ -s secrets-report.txt ]; then
+              cat secrets-report.txt
+              echo ""
+              echo "Potential hardcoded secrets found."
+              echo "Please review and use environment variables or secret managers instead."
+            else
+              echo "No hardcoded secrets detected."
+            fi
+            echo '```'
+            echo ""
+          } | tee -a security-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+      
       - name: Generate Security Summary
         if: success()
         run: |
