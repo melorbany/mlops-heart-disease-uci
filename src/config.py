@@ -27,7 +27,7 @@ MLFLOW_EXPERIMENT_NAME = "heart-disease-classification"
 
 RAW_DATA_PATH = RAW_DATA_DIR / "heart.csv"
 PROCESSED_DATA_PATH = PROCESSED_DATA_DIR / "heart_clean.csv"
-FINAL_MODEL_PATH = MODELS_DIR / "final_model.pkl"
+FINAL_MODEL_PATH = MODELS_DIR / "heart_model.pkl"
 
 TARGET_COLUMN = "target"
 

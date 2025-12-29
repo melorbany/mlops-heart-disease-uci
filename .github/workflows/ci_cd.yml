@@ -97,12 +97,7 @@ jobs:
             echo "Hint: run 'isort --profile black src/' locally to auto-sort imports if needed."
             echo ""
           } | tee -a lint-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
-      - name: Generate Lint Summary
-        if: success()
-        run: |
-            echo "---" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo "All linting checks passed." | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
+    
       - name: Upload lint summary artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -218,12 +213,6 @@ jobs:
             echo ""
           } | tee -a security-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
       
-      - name: Generate Security Summary
-        if: success()
-        run: |
-          echo "---" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-          echo "All security checks passed." | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
-
       - name: Upload security summary artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -232,16 +221,180 @@ jobs:
           path: |
             security-summary.txt
 
+
+  # ==========================================
+  # DATA FETCH & PROCESS
+  # ==========================================
+  data:
+    name: Data Fetch & Process
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Clean previous data
+        run: |
+          echo "Cleaning previous data directories..."
+          rm -rf data/raw data/processed artifacts models || true
+          mkdir -p data/raw data/processed artifacts models
+
+      - name: Download dataset
+        run: |
+          echo "Running: python -m src.data.download_data"
+          python -m src.data.download_data
+
+      - name: Convert UCI data to CSV
+        run: |
+          echo "Running: python -m src.data.convert_uci_to_csv"
+          python -m src.data.convert_uci_to_csv
+
+      - name: Preprocess CSV files
+        run: |
+          echo "Running: python -m src.data.preprocess"
+          python -m src.data.preprocess
+
+      - name: Verify processed dataset
+        run: |
+          if [ ! -f "data/processed/heart_clean.csv" ]; then
+            echo "ERROR: data/processed/heart_clean.csv not found after preprocessing."
+            exit 1
+          fi
+
+      - name: Upload processed dataset artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: processed-data
+          path: data/processed/heart_clean.csv
+          if-no-files-found: error
+
+
+  # ==========================================
+  # TRAIN MODEL
+  # ==========================================
+  train-model:
+    name: Train Model
+    runs-on: ubuntu-latest
+    needs: data
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download processed dataset artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: processed-data
+          path: data/processed
+
+      - name: Train model
+        env:
+          PROCESSED_DATA_PATH: data/processed/heart_clean.csv
+        run: |
+          echo "Using processed data at: $PROCESSED_DATA_PATH"
+          echo "Running: python -m src.models.train_model"
+          python -m src.models.train_model
+
+      - name: Upload trained model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: heart-model
+          path: models/
+          if-no-files-found: error
+      - name: Upload MLflow tracking DB
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-db
+          path: mlflow/mlflow.db         
+          if-no-files-found: error
+
+  # ==========================================
+  # MLFLOW REPORT
+  # ==========================================
+  mlflow-report:
+    name: MLflow Report
+    runs-on: ubuntu-latest
+    needs: train-model
+
+    steps:
+      - name: Download MLflow tracking DB
+        uses: actions/download-artifact@v4
+        with:
+          name: mlflow-db
+          path: mlflow-db
+
+      - name: Show MLflow runs in job summary
+        run: |
+          echo "## MLflow Experiment Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          DB_PATH="mlflow-db/mlflow.db"
+
+          if [ ! -f "$DB_PATH" ]; then
+            echo "MLflow DB not found at $DB_PATH" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "Using database: \`$DB_PATH\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### Latest Runs" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Run ID | Experiment ID | Status | Start Time | End Time |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|---------------|--------|-----------|----------|" >> "$GITHUB_STEP_SUMMARY"
+
+          # Query runs table from MLflow DB (SQLite)
+          # Adjust column names if your MLflow version differs.
+          sqlite3 -header -csv "$DB_PATH" "
+            SELECT run_uuid, experiment_id, status, start_time, end_time
+            FROM runs
+            ORDER BY start_time DESC
+            LIMIT 10;
+          " | tail -n +2 | while IFS=',' read -r run_id exp_id status start_time end_time; do
+            echo "| $run_id | $exp_id | $status | $start_time | $end_time |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
   # ==========================================
   # TESTING & COVERAGE
   # ==========================================
   test:
     name: Tests & Coverage
     runs-on: ubuntu-latest
+    needs: train-model
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download trained model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: heart-model
+          path: models/
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
@@ -373,162 +526,6 @@ jobs:
             htmlcov/
             test-report.html
           compression-level: 6
-
-  # ==========================================
-  # DOWNLOAD DATA & PROCESS
-  # ==========================================
-  data:
-    name: Download Dataset & Process
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Clean previous data
-        run: |
-          echo "Cleaning previous data directories..."
-          rm -rf data/raw data/processed artifacts models || true
-          mkdir -p data/raw data/processed artifacts models
-
-      - name: Download dataset
-        run: |
-          echo "Running: python -m src.data.download_data"
-          python -m src.data.download_data
-
-      - name: Convert UCI data to CSV
-        run: |
-          echo "Running: python -m src.data.convert_uci_to_csv"
-          python -m src.data.convert_uci_to_csv
-
-      - name: Preprocess CSV files
-        run: |
-          echo "Running: python -m src.data.preprocess"
-          python -m src.data.preprocess
-
-      - name: Verify processed dataset
-        run: |
-          if [ ! -f "data/processed/heart_clean.csv" ]; then
-            echo "ERROR: data/processed/heart_clean.csv not found after preprocessing."
-            exit 1
-          fi
-
-      - name: Upload processed dataset artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: processed-data
-          path: data/processed/heart_clean.csv
-          if-no-files-found: error
-
-
-  # ==========================================
-  # TRAIN MODEL
-  # ==========================================
-  train-model:
-    name: Train Model
-    runs-on: ubuntu-latest
-    needs: data
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Download processed dataset artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: processed-data
-          path: data/processed
-
-      - name: Train model
-        env:
-          PROCESSED_DATA_PATH: data/processed/heart_clean.csv
-        run: |
-          echo "Using processed data at: $PROCESSED_DATA_PATH"
-          echo "Running: python -m src.models.train_model"
-          python -m src.models.train_model
-
-      - name: Upload trained model artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: heart-model
-          path: models/
-          if-no-files-found: error
-      - name: Upload MLflow tracking DB
-        uses: actions/upload-artifact@v4
-        with:
-          name: mlflow-db
-          path: mlflow/mlflow.db         
-          if-no-files-found: error
-          
-  # ==========================================
-  # MLFLOW REPORT
-  # ==========================================
-  mlflow-report:
-    name: MLflow Report
-    runs-on: ubuntu-latest
-    needs: train-model
-
-    steps:
-      - name: Download MLflow tracking DB
-        uses: actions/download-artifact@v4
-        with:
-          name: mlflow-db
-          path: mlflow-db
-
-      - name: Show MLflow runs in job summary
-        run: |
-          echo "## MLflow Experiment Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-
-          DB_PATH="mlflow-db/mlflow.db"
-
-          if [ ! -f "$DB_PATH" ]; then
-            echo "MLflow DB not found at $DB_PATH" >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-
-          echo "Using database: \`$DB_PATH\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-
-          echo "### Latest Runs" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Run ID | Experiment ID | Status | Start Time | End Time |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-------|---------------|--------|-----------|----------|" >> "$GITHUB_STEP_SUMMARY"
-
-          # Query runs table from MLflow DB (SQLite)
-          # Adjust column names if your MLflow version differs.
-          sqlite3 -header -csv "$DB_PATH" "
-            SELECT run_uuid, experiment_id, status, start_time, end_time
-            FROM runs
-            ORDER BY start_time DESC
-            LIMIT 10;
-          " | tail -n +2 | while IFS=',' read -r run_id exp_id status start_time end_time; do
-            echo "| $run_id | $exp_id | $status | $start_time | $end_time |" >> "$GITHUB_STEP_SUMMARY"
-          done
-
-          echo "" >> "$GITHUB_STEP_SUMMARY"
 
   # ==========================================
   # DOCKER BUILD & VALIDATE
@@ -803,3 +800,208 @@ jobs:
           fi
 
           echo "Cloud server health check passed."
+
+
+  # ==========================================
+  # TEST PREDICT API
+  # ==========================================
+  predict-api:
+    name: Test Predict API
+    runs-on: ubuntu-latest
+    needs: cloud-deploy
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Install curl and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl jq
+
+      - name: Check API /health on server
+        run: |
+          HEALTH_URL="http://${{ secrets.CLOUD_HOST }}/health"
+          echo "Checking health at: $HEALTH_URL"
+
+          for i in {1..10}; do
+            if curl --silent --fail "$HEALTH_URL" -o server_health_response.json; then
+              echo "Health endpoint is responding."
+              cat server_health_response.json
+              break
+            else
+              echo "Health check failed, retrying in 5s... (attempt $i/10)"
+              sleep 5
+            fi
+          done
+
+          if [ ! -f server_health_response.json ]; then
+            echo "Health endpoint did not respond after retries."
+            exit 1
+          fi
+
+          if ! grep -q '"status"' server_health_response.json || ! grep -q '"ok"' server_health_response.json; then
+            echo "Server health response does not contain expected status=ok"
+            cat server_health_response.json
+            exit 1
+          fi
+
+          echo "Cloud server health check passed."
+
+      - name: Test /predict endpoint
+        run: |
+          PREDICT_URL="http://${{ secrets.CLOUD_HOST }}/predict"
+          echo "Testing predict endpoint at: $PREDICT_URL"
+          
+          # Sample patient data for prediction
+          SAMPLE_DATA='{
+            "age": 63,
+            "sex": 1,
+            "cp": 3,
+            "trestbps": 145,
+            "chol": 233,
+            "fbs": 1,
+            "restecg": 0,
+            "thalach": 150,
+            "exang": 0,
+            "oldpeak": 2.3,
+            "slope": 0,
+            "ca": 0,
+            "thal": 1
+          }'
+          
+          echo "Sending prediction request with sample data:"
+          echo "$SAMPLE_DATA" | jq '.'
+          
+          # Make prediction request
+          HTTP_STATUS=$(curl -s -o predict_response.json -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d "$SAMPLE_DATA" \
+            "$PREDICT_URL")
+          
+          echo "HTTP Status Code: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Prediction request failed with status $HTTP_STATUS"
+            cat predict_response.json
+            exit 1
+          fi
+          
+          echo "Prediction response:"
+          cat predict_response.json | jq '.'
+          
+          # Validate response structure
+          if ! jq -e '.prediction' predict_response.json > /dev/null; then
+            echo "Response missing 'prediction' field"
+            exit 1
+          fi
+          
+          if ! jq -e '.probability' predict_response.json > /dev/null; then
+            echo "Response missing 'probability' field"
+            exit 1
+          fi
+          
+          # Extract and validate values
+          PREDICTION=$(jq -r '.prediction' predict_response.json)
+          PROBABILITY=$(jq -r '.probability' predict_response.json)
+          
+          echo "Extracted values:"
+          echo "  Prediction: $PREDICTION"
+          echo "  Probability: $PROBABILITY"
+          
+          # Validate prediction is 0 or 1
+          if [ "$PREDICTION" != "0" ] && [ "$PREDICTION" != "1" ]; then
+            echo "Invalid prediction value: $PREDICTION (expected 0 or 1)"
+            exit 1
+          fi
+          
+          # Validate probability is between 0 and 1
+          if ! echo "$PROBABILITY" | awk '{exit !($1 >= 0 && $1 <= 1)}'; then
+            echo "Invalid probability value: $PROBABILITY (expected 0.0 to 1.0)"
+            exit 1
+          fi
+          
+          echo "[PASS] Prediction API test passed successfully!"
+          echo "   Prediction: $PREDICTION ($([ "$PREDICTION" = "1" ] && echo "Disease" || echo "No Disease"))"
+          echo "   Probability: $PROBABILITY ($(echo "$PROBABILITY * 100" | bc)%)"
+
+      - name: Test /predict endpoint with multiple samples
+        run: |
+          PREDICT_URL="http://${{ secrets.CLOUD_HOST }}/predict"
+          echo "Testing predict endpoint with multiple sample cases..."
+          
+          # Test Case 1: Low-risk patient
+          echo ""
+          echo "--- Test Case 1: Low-risk patient ---"
+          LOW_RISK_DATA='{
+            "age": 40,
+            "sex": 0,
+            "cp": 0,
+            "trestbps": 120,
+            "chol": 200,
+            "fbs": 0,
+            "restecg": 0,
+            "thalach": 170,
+            "exang": 0,
+            "oldpeak": 0.0,
+            "slope": 0,
+            "ca": 0,
+            "thal": 2
+          }'
+          
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -d "$LOW_RISK_DATA" \
+            "$PREDICT_URL" | jq '.'
+          
+          # Test Case 2: High-risk patient
+          echo ""
+          echo "--- Test Case 2: High-risk patient ---"
+          HIGH_RISK_DATA='{
+            "age": 67,
+            "sex": 1,
+            "cp": 0,
+            "trestbps": 160,
+            "chol": 286,
+            "fbs": 0,
+            "restecg": 0,
+            "thalach": 108,
+            "exang": 1,
+            "oldpeak": 1.5,
+            "slope": 1,
+            "ca": 3,
+            "thal": 2
+          }'
+          
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -d "$HIGH_RISK_DATA" \
+            "$PREDICT_URL" | jq '.'
+          
+          echo ""
+          echo "[PASS] Multiple sample tests completed successfully!"
+
+      - name: Test error handling
+        run: |
+          PREDICT_URL="http://${{ secrets.CLOUD_HOST }}/predict"
+          echo "Testing error handling with invalid data..."
+          
+          # Test with missing field
+          INVALID_DATA='{
+            "age": 63,
+            "sex": 1
+          }'
+          
+          HTTP_STATUS=$(curl -s -o error_response.json -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d "$INVALID_DATA" \
+            "$PREDICT_URL")
+          
+          echo "HTTP Status Code for invalid data: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "[WARNING] API accepted invalid data (should return 400 or 422)"
+          else
+            echo "[PASS] API correctly rejected invalid data"
+            cat error_response.json | jq '.' || cat error_response.json
+          fi

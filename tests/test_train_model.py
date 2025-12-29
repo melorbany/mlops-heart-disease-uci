@@ -40,7 +40,7 @@ def test_train_model_runs_and_saves_model(tmp_path, monkeypatch, tiny_processed_
     """
     # Prepare temporary files/dirs
     processed_path = tmp_path / "heart_clean.csv"
-    final_model_path = tmp_path / "final_model.pkl"
+    final_model_path = tmp_path / "heart_model.pkl"
     artifacts_dir = tmp_path / "artifacts"
 
     # Save synthetic processed data
@@ -93,7 +93,7 @@ def test_train_model_uses_mlflow_utils(tmp_path, monkeypatch, tiny_processed_df)
     We mock them and assert they were invoked.
     """
     processed_path = tmp_path / "heart_clean.csv"
-    final_model_path = tmp_path / "final_model.pkl"
+    final_model_path = tmp_path / "heart_model.pkl"
     artifacts_dir = tmp_path / "artifacts"
 
     tiny_processed_df.to_csv(processed_path, index=False)
