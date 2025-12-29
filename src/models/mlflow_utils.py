@@ -1,6 +1,7 @@
-import mlflow
 from typing import Dict
-from src.config import MLFLOW_TRACKING_URI, MLFLOW_EXPERIMENT_NAME
+
+import mlflow
+from src.config import MLFLOW_EXPERIMENT_NAME, MLFLOW_TRACKING_URI
 
 
 def init_mlflow() -> None:

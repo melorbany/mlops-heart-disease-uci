@@ -21,7 +21,6 @@ import requests
 
 from src.config import RAW_DATA_DIR
 
-
 # Base URL where the processed files are hosted.
 # This is the original UCI "processed" directory:
 # https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/

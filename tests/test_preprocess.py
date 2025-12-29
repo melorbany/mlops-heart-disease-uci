@@ -1,7 +1,7 @@
 import pandas as pd
 
-from src.data.preprocess import clean_data
 from src.config import TARGET_COLUMN
+from src.data.preprocess import clean_data
 
 
 def test_clean_data():

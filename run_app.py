@@ -5,13 +5,8 @@ import sys
 from argparse import ArgumentParser
 
 # Import paths from your config module
-from src.config import (
-    DATA_DIR,
-    ARTIFACTS_DIR,
-    MLFLOW_DIR,
-    MODELS_DIR,
-    MLRUN_DIR,
-)
+from src.config import (ARTIFACTS_DIR, DATA_DIR, MLFLOW_DIR, MLRUN_DIR,
+                        MODELS_DIR)
 
 
 def is_running_in_docker() -> bool:

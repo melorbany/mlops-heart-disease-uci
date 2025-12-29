@@ -6,7 +6,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from src.config import NUMERIC_FEATURES, CATEGORICAL_FEATURES, TARGET_COLUMN
+from src.config import CATEGORICAL_FEATURES, NUMERIC_FEATURES, TARGET_COLUMN
 
 
 def split_features_target(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:

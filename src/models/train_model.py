@@ -3,36 +3,35 @@ import json
 from pathlib import Path
 
 import matplotlib
-
-matplotlib.use("Agg")  # Use non‑interactive backend, avoids Tk / GUI issues
-
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
+    ConfusionMatrixDisplay,
+    RocCurveDisplay,
     accuracy_score,
+    f1_score,
     precision_score,
     recall_score,
-    f1_score,
     roc_auc_score,
-    RocCurveDisplay,
-    ConfusionMatrixDisplay,
 )
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestClassifier
 
 from src.config import (
-    PROCESSED_DATA_PATH,
-    FINAL_MODEL_PATH,
     ARTIFACTS_DIR,
+    FINAL_MODEL_PATH,
+    PROCESSED_DATA_PATH,
     RANDOM_STATE,
     TEST_SIZE,
 )
-from src.features.build_features import split_features_target, build_preprocessor
-from src.models.mlflow_utils import start_run, log_params, log_metrics, log_artifact
+from src.features.build_features import build_preprocessor, split_features_target
+from src.models.mlflow_utils import log_artifact, log_metrics, log_params, start_run
+
+matplotlib.use("Agg")  # Use non‑interactive backend, avoids Tk / GUI issues
 
 
 def evaluate_model(model, X_test, y_test, prefix: str, artifact_dir: Path):

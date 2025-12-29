@@ -4,7 +4,7 @@ from typing import Tuple
 
 import pandas as pd
 
-from src.config import RAW_DATA_PATH, PROCESSED_DATA_PATH, TARGET_COLUMN
+from src.config import PROCESSED_DATA_PATH, RAW_DATA_PATH, TARGET_COLUMN
 
 
 def load_raw_data(path: Path) -> pd.DataFrame:

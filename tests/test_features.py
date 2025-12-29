@@ -1,6 +1,7 @@
 import pandas as pd
-from src.features.build_features import build_preprocessor
+
 from src.config import NUMERIC_FEATURES, TARGET_COLUMN
+from src.features.build_features import build_preprocessor
 
 
 def test_build_preprocessor():

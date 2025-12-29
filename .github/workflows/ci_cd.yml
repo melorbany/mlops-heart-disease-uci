@@ -12,10 +12,13 @@ env:
   APP_CONTAINER_NAME: "heart-predict-api"
 
 jobs:
-  lint-test:
-    name: Lint & Test
+  # ==========================================
+  # CODE LINTING 
+  # ==========================================
+  lint:
+    name: Code Linting
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,57 +27,457 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install linting tools
+        run: |
+            python -m pip install --upgrade pip
+            pip install flake8 pylint black isort autopep8
+
+      - name: Initialize lint summary file
+        run: |
+            echo "Linting & Formatting Results" > lint-summary.txt
+            echo "" >> lint-summary.txt
+            echo "## Linting & Formatting Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Use Flake8 (PEP 8 Style Enforcement)
+        run: |
+            echo "### 1. Flake8 (PEP 8 Style Enforcement)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+            if flake8 src/ \
+              --max-line-length=100 \
+              --max-complexity=10 \
+              --statistics \
+              --count \
+              --show-source \
+              --exclude=__pycache__,*.pyc,.git,__init__.py,migrations \
+              > flake8-report.txt 2>&1; then
+              echo "No PEP 8 violations found" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            else
+              cat flake8-report.txt | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "Flake8 violations found" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+
+            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate Code Quality
+        run: |
+            echo "### 2. Pylint (Code Quality)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+            if pylint src/ \
+              --output-format=text \
+              --reports=y \
+              --disable=C0111,C0103,R0903,W0212 \
+              --fail-under=7.0 \
+              --max-line-length=100 \
+              > pylint-report.txt 2>&1; then
+              echo "Pylint score above threshold (7.0)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              tail -20 pylint-report.txt | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            else
+              cat pylint-report.txt | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "Pylint score below threshold" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+
+            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check Code Formatting
+        run: |
+            echo "### 3. Black (Code Formatting)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+            if black --check --diff --line-length=100 src/ > black-report.txt 2>&1; then
+              echo "All files properly formatted with Black" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            else
+              cat black-report.txt | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "Code formatting issues found" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "Hint: run 'black --line-length=100 src/' locally to auto-format" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+
+            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check Import Order
+        run: |
+            echo "### 4. isort (Import Organization)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+            # Check-only, do not modify code
+            if isort --check-only --diff --profile black src/ > isort-report.txt 2>&1; then
+              echo "All imports properly sorted (isort --profile black src/)" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            else
+              cat isort-report.txt | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "Import sorting issues found" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "Hint: run 'isort --profile black src/' locally to auto-sort imports" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+
+            echo '```' | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate Lint Summary
+        if: success()
+        run: |
+            echo "---" | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "All linting checks passed." | tee -a lint-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload lint summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-summary
+          path: lint-summary.txt
+          compression-level: 6
+
+  # ==========================================
+  # SECURITY ANALYSIS
+  # ========================================== 
+  security:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit safety pip-audit semgrep
+
+      - name: Initialize security summary file
+        run: |
+          echo "Security Analysis Results" > security-summary.txt
+          echo "" >> security-summary.txt
+          echo "## Security Analysis Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Security Linter
+        run: |
+          echo "### 1. Bandit (Python Security Linter)" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+          if bandit -r src/ \
+            -f txt \
+            --severity-level medium \
+            --confidence-level medium \
+            --skip B101,B601 \
+            -ll > bandit-report.txt 2>&1; then
+            echo "No security issues found by Bandit" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat bandit-report.txt | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "Security vulnerabilities detected by Bandit" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check Dependency Vulnerabilities
+        run: |
+          echo "### 2. Safety (Dependency Vulnerabilities)" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+          pip freeze > requirements-frozen.txt
+
+          if safety check \
+            --file requirements-frozen.txt \
+            --output text \
+            > safety-report.txt 2>&1; then
+            echo "No vulnerable dependencies found" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat safety-report.txt | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "Vulnerable dependencies detected" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "Please review and update vulnerable packages" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            # Warning only, do not fail the job
+          fi
+
+          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check Package Security
+        run: |
+          echo "### 3. pip-audit (PyPI Package Security)" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+          # Use the frozen requirements from the Safety step
+          if pip-audit \
+            --requirement requirements-frozen.txt \
+            --format json \
+            --output pip-audit-report.json \
+            > pip-audit-report.txt 2>&1; then
+            echo "No security issues found by pip-audit" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat pip-audit-report.txt | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "Package security issues detected by pip-audit" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            # Warning only, do not fail the job
+          fi
+
+          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+          # Move JSON into a known location for SARIF upload or future processing
+          mkdir -p security-reports
+          mv pip-audit-report.json security-reports/pip-audit-report.json
+
+      - name: Semgrep (SAST)
+        run: |
+          echo "### 4. Semgrep (SAST)" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+          mkdir -p security-reports
+
+          if semgrep scan \
+            --config=auto \
+            --severity=ERROR \
+            --severity=WARNING \
+            --json \
+            --output=security-reports/semgrep-report.json \
+            src/ > semgrep-report.txt 2>&1; then
+            echo "No critical security patterns found by Semgrep" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat semgrep-report.txt | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "Security patterns detected by Semgrep" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Secret Detection
+        run: |
+          echo "### 5. Secret Detection" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+          SECRET_PATTERNS=(
+            "password\s*=\s*['\"].*['\"]"
+            "api[_-]?key\s*=\s*['\"].*['\"]"
+            "secret\s*=\s*['\"].*['\"]"
+            "token\s*=\s*['\"].*['\"]"
+            "aws[_-]?(access|secret)[_-]?key"
+          )
+
+          SECRETS_FOUND=0
+          : > secrets-report.txt
+
+          for pattern in "${SECRET_PATTERNS[@]}"; do
+            if grep -r -i -E "$pattern" src/ --exclude-dir=__pycache__ >> secrets-report.txt 2>&1; then
+              SECRETS_FOUND=1
+            fi
+          done
+
+          if [ "$SECRETS_FOUND" -eq 0 ]; then
+            echo "No hardcoded secrets detected" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat secrets-report.txt | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "Potential hardcoded secrets found" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "Please review and use environment variables or secret managers instead" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo '```' | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate Security Summary
+        if: success()
+        run: |
+          echo "---" | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "All security checks passed." | tee -a security-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload security summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: |
+            security-summary.txt
+            security-reports/semgrep-report.json
+          retention-days: 30
+          compression-level: 6
+
+      - name: Upload Semgrep SARIF (for GitHub Security)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: security-reports/semgrep-report.json
+        continue-on-error: true
+
+  # ==========================================
+  # TESTING & COVERAGE
+  # ==========================================
+  test:
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ruff pytest
+          pip install pytest pytest-cov pytest-html pytest-xdist pytest-timeout coverage
 
-      - name: Run linting 
-        run: ruff check .
-
-      - name: Download data and train model for testing
-        run: python -m run_app --no-api
-
-      - name: Run tests with coverage
+      - name: Initialize test summary file
         run: |
-          pytest tests/ -v \
+          echo "Test and Coverage Results" > test-summary.txt
+          echo "" >> test-summary.txt
+          echo "## Test and Coverage Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run Unit Tests with Coverage
+        id: unit-tests
+        run: |
+          echo "### 1. Test Execution" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+          # Run tests with coverage
+          pytest tests/ \
+            -v \
             --cov=src \
             --cov-report=term-missing \
-            --cov-report=xml \
-            --cov-report=html \
-            --cov-report=json
-    
-      - name: Generate Coverage Summary
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --cov-report=json:coverage.json \
+            --html=test-report.html \
+            --self-contained-html \
+            --junitxml=junit.xml \
+            --maxfail=5 \
+            --tb=short \
+            -n auto 2>&1 | tee test-output.txt
+
+          # Tail key lines into the summary
+          tail -30 test-output.txt | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+          echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate Coverage Report
+        if: always()
         run: |
-          echo "## Test Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Extract coverage percentage from coverage.json
-          COVERAGE=$(python -c "import json; print(json.load(open('coverage.json'))['totals']['percent_covered_display'])")
-          
-          echo "**Total Coverage:** ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Add coverage table
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Coverage | ${COVERAGE}% |" >> $GITHUB_STEP_SUMMARY
-          
-          # Show detailed report
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Detailed Coverage" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          coverage report >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-      
-      - name: Upload HTML Coverage Report
+          echo "### 2. Code Coverage Report" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -f coverage.json ]; then
+            COVERAGE=$(python3 -c "import json; data=json.load(open('coverage.json')); print(f\"{data['totals']['percent_covered']:.2f}\")" 2>/dev/null || echo "0")
+
+            echo "**Total Coverage:** ${COVERAGE}%" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+            # Detailed coverage report
+            echo "#### 2.1 Detailed Coverage by Module" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            coverage report --skip-covered >> coverage-report.txt 2>/dev/null || echo "Coverage report not available" >> coverage-report.txt
+
+            cat coverage-report.txt | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+            # Missing coverage
+            echo "#### 2.2 Files with Missing Coverage" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            coverage report --skip-covered --show-missing > coverage-missing.txt 2>/dev/null || echo "Coverage report not available" > coverage-missing.txt
+
+            # Filter out fully covered files, if any
+            if grep -v "100%" coverage-missing.txt > coverage-missing-filtered.txt 2>/dev/null && [ -s coverage-missing-filtered.txt ]; then
+              cat coverage-missing-filtered.txt | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "All files have 100% coverage." | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            fi
+
+            echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Coverage data not available" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Check Coverage Threshold
+        run: |
+          echo "### 3. Coverage Threshold Check" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -f coverage.json ]; then
+            COVERAGE=$(python3 -c "import json; print(json.load(open('coverage.json'))['totals']['percent_covered'])" 2>/dev/null || echo 0)
+            THRESHOLD=60
+
+            if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+              MSG="Coverage (${COVERAGE}%) is below threshold (${THRESHOLD}%)"
+              echo "$MSG" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "$MSG"
+              exit 1
+            else
+              MSG="Coverage (${COVERAGE}%) meets threshold (${THRESHOLD}%)"
+              echo "$MSG" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "$MSG"
+            fi
+          else
+            echo "Coverage threshold check skipped: coverage.json not found" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Final Test Summary
+        if: success()
+        run: |
+          echo "---" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "All tests passed and coverage meets the required threshold." | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      # Single artifact with tests + coverage outputs
+      - name: Upload test and coverage artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-html-report
-          path: htmlcov/
+          name: test-summary
+          path: |
+            test-summary.txt
+            test-output.txt
+            coverage.xml
+            junit.xml
+            htmlcov/
+            test-report.html
+          compression-level: 6
 
+  # ==========================================
+  # TRAIN MODEL
+  # ==========================================
   train-model:
     name: Train Model
     runs-on: ubuntu-latest
@@ -87,6 +490,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
 
       - name: Install dependencies for training
         run: |
@@ -130,7 +534,9 @@ jobs:
     name: Docker Build & Validate
     runs-on: ubuntu-latest
     needs:
-      - lint-test
+      - lint
+      - security
+      - test
       - train-model
 
     steps:
