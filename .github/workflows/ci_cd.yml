@@ -35,13 +35,6 @@ jobs:
           pip install -r requirements.txt
             pip install flake8 pylint black isort autopep8
     
-      - name: Initialize lint summary file
-        run: |
-            echo "Linting & Formatting Results" > lint-summary.txt
-            echo "" >> lint-summary.txt
-            echo "## Linting & Formatting Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-
       - name: Use Flake8 (PEP 8 Style Enforcement)
         run: |
           {
@@ -56,7 +49,7 @@ jobs:
               --exclude=__pycache__,*.pyc,.git,__init__.py,migrations || true
             echo '```'
             echo ""
-          } | tee -a lint-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          }
 
       - name: Validate Code Quality
         run: |
@@ -71,7 +64,7 @@ jobs:
               --max-line-length=100 || true
             echo '```'
             echo ""
-          } | tee -a lint-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          }
 
       - name: Check Code Formatting
         run: |
@@ -83,7 +76,7 @@ jobs:
             echo ""
             echo "Hint: run 'black --line-length=100 src/' locally to auto-format if needed."
             echo ""
-          } | tee -a lint-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          }
 
       - name: Check Import Order
         run: |
@@ -96,15 +89,8 @@ jobs:
             echo ""
             echo "Hint: run 'isort --profile black src/' locally to auto-sort imports if needed."
             echo ""
-          } | tee -a lint-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          }
     
-      - name: Upload lint summary artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lint-summary
-          path: lint-summary.txt
-          compression-level: 6
 
   # ==========================================
   # SECURITY ANALYSIS
@@ -129,14 +115,6 @@ jobs:
           pip install -r requirements.txt
           pip install bandit safety pip-audit
 
-
-      - name: Initialize security summary file
-        run: |
-          echo "Security Analysis Results" > security-summary.txt
-          echo "" >> security-summary.txt
-          echo "## Security Analysis Results" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-
       - name: Security Linter
         run: |
           {
@@ -150,7 +128,7 @@ jobs:
               -ll || true
             echo '```'
             echo ""
-          } | tee -a security-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          }
 
       - name: Check Dependency Vulnerabilities
         run: |
@@ -164,7 +142,7 @@ jobs:
               --output text || true
             echo '```'
             echo ""
-          } | tee -a security-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          }
 
       - name: Check Package Security
         run: |
@@ -177,7 +155,7 @@ jobs:
               --output pip-audit-report.json || true
             echo '```'
             echo ""
-          } | tee -a security-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          }
 
           mkdir -p security-reports
           mv pip-audit-report.json security-reports/pip-audit-report.json || true
@@ -211,16 +189,7 @@ jobs:
             fi
             echo '```'
             echo ""
-          } | tee -a security-summary.txt >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
-      
-      - name: Upload security summary artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-summary
-          path: |
-            security-summary.txt
-
+          }
 
   # ==========================================
   # DATA FETCH & PROCESS
@@ -345,39 +314,260 @@ jobs:
           name: mlflow-db
           path: mlflow-db
 
-      - name: Show MLflow runs in job summary
+      - name: Show MLflow runs in job summary (rich)
+        shell: bash
         run: |
+          set -euo pipefail
+
           echo "## MLflow Experiment Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
           DB_PATH="mlflow-db/mlflow.db"
 
           if [ ! -f "$DB_PATH" ]; then
-            echo "MLflow DB not found at $DB_PATH" >> "$GITHUB_STEP_SUMMARY"
+            echo "**MLflow DB not found** at \`$DB_PATH\`" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 
-          echo "Using database: \`$DB_PATH\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Using database:** \`$DB_PATH\`" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
-          echo "### Latest Runs" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Run ID | Experiment ID | Status | Start Time | End Time |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-------|---------------|--------|-----------|----------|" >> "$GITHUB_STEP_SUMMARY"
+          # Helper: check if a table exists (works in SQLite)
+          has_table () {
+            local t="$1"
+            sqlite3 "$DB_PATH" "SELECT name FROM sqlite_master WHERE type='table' AND name='$t';" | grep -q "^$t$"
+          }
 
-          # Query runs table from MLflow DB (SQLite)
-          # Adjust column names if your MLflow version differs.
-          sqlite3 -header -csv "$DB_PATH" "
-            SELECT run_uuid, experiment_id, status, start_time, end_time
+          # Helper: run a SQL query only if all referenced tables exist (best effort)
+          run_sql () {
+            local title="$1"
+            local sql="$2"
+            echo "### $title" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            # Print as markdown table (header + rows)
+            # Convert CSV -> markdown table in bash
+            local csv
+            csv="$(sqlite3 -header -csv "$DB_PATH" "$sql" || true)"
+            if [ -z "$csv" ]; then
+              echo "_No data found (or schema mismatch for your MLflow version)._ " >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              return 0
+            fi
+
+            # Turn CSV into markdown table
+            # First line = header
+            local header
+            header="$(echo "$csv" | head -n 1)"
+            IFS=',' read -r -a cols <<< "$header"
+
+            # Header row
+            printf '|' >> "$GITHUB_STEP_SUMMARY"
+            for c in "${cols[@]}"; do printf ' %s |' "$c" >> "$GITHUB_STEP_SUMMARY"; done
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+
+            # Separator row
+            printf '|' >> "$GITHUB_STEP_SUMMARY"
+            for _ in "${cols[@]}"; do printf '---|' >> "$GITHUB_STEP_SUMMARY"; done
+            printf '\n' >> "$GITHUB_STEP_SUMMARY"
+
+            # Data rows
+            echo "$csv" | tail -n +2 | while IFS=',' read -r -a row; do
+              printf '|' >> "$GITHUB_STEP_SUMMARY"
+              for cell in "${row[@]}"; do
+                # Basic sanitization for markdown tables
+                cell="${cell//|/\\|}"
+                printf ' %s |' "$cell" >> "$GITHUB_STEP_SUMMARY"
+              done
+              printf '\n' >> "$GITHUB_STEP_SUMMARY"
+            done
+
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          echo "### DB / Schema" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**SQLite tables detected:**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          sqlite3 "$DB_PATH" ".tables" >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # Experiments overview
+          if has_table experiments; then
+            run_sql "Experiments" "
+              SELECT
+                experiment_id,
+                name,
+                artifact_location,
+                lifecycle_stage
+              FROM experiments
+              ORDER BY CAST(experiment_id AS INTEGER) ASC;
+            "
+          else
+            echo "_Table \`experiments\` not found._" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Latest runs (more fields)
+          if has_table runs; then
+            run_sql "Latest Runs (detailed)" "
+              SELECT
+                run_uuid AS run_id,
+                experiment_id,
+                status,
+                lifecycle_stage,
+                user_id,
+                start_time,
+                end_time,
+                artifact_uri
+              FROM runs
+              ORDER BY start_time DESC
+              LIMIT 10;
+            "
+          else
+            echo "_Table \`runs\` not found._" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # Params for latest runs
+          if has_table params; then
+            run_sql "Params (latest runs)" "
+              SELECT
+                p.run_uuid AS run_id,
+                p.key,
+                p.value
+              FROM params p
+              WHERE p.run_uuid IN (
+                SELECT run_uuid FROM runs ORDER BY start_time DESC LIMIT 10
+              )
+              ORDER BY p.run_uuid, p.key;
+            "
+          else
+            echo "_Table \`params\` not found._" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Metrics (latest values). Many MLflow DBs have multiple metric rows per key.
+          if has_table metrics; then
+            # Try to pick the "latest" metric row per (run_uuid, key) using max(step) then max(timestamp).
+            # This handles most MLflow schemas.
+            run_sql "Metrics (latest value per key for latest runs)" "
+              WITH latest AS (
+                SELECT
+                  m.run_uuid,
+                  m.key,
+                  MAX(COALESCE(m.step, 0)) AS max_step
+                FROM metrics m
+                WHERE m.run_uuid IN (SELECT run_uuid FROM runs ORDER BY start_time DESC LIMIT 10)
+                GROUP BY m.run_uuid, m.key
+              ),
+              latest2 AS (
+                SELECT
+                  m.run_uuid,
+                  m.key,
+                  m.value,
+                  m.step,
+                  m.timestamp
+                FROM metrics m
+                JOIN latest l
+                  ON l.run_uuid = m.run_uuid
+                AND l.key = m.key
+                AND COALESCE(l.max_step, 0) = COALESCE(m.step, 0)
+                WHERE m.run_uuid IN (SELECT run_uuid FROM runs ORDER BY start_time DESC LIMIT 10)
+              )
+              SELECT
+                run_uuid AS run_id,
+                key,
+                value,
+                step,
+                timestamp
+              FROM latest2
+              ORDER BY run_uuid, key;
+            "
+          else
+            echo "_Table \`metrics\` not found._" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Tags for latest runs (git sha, host, dataset info, etc.)
+          # Table name is usually "tags" in older schemas and "run_tags" in newer ones.
+          if has_table tags; then
+            run_sql "Tags (latest runs)" "
+              SELECT
+                t.run_uuid AS run_id,
+                t.key,
+                t.value
+              FROM tags t
+              WHERE t.run_uuid IN (
+                SELECT run_uuid FROM runs ORDER BY start_time DESC LIMIT 10
+              )
+              ORDER BY t.run_uuid, t.key;
+            "
+          elif has_table run_tags; then
+            run_sql "Tags (latest runs)" "
+              SELECT
+                t.run_uuid AS run_id,
+                t.key,
+                t.value
+              FROM run_tags t
+              WHERE t.run_uuid IN (
+                SELECT run_uuid FROM runs ORDER BY start_time DESC LIMIT 10
+              )
+              ORDER BY t.run_uuid, t.key;
+            "
+          else
+            echo "_No tags table found (\`tags\` or \`run_tags\`)._" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Artifacts listing (only if you also have local artifact store available in the workflow)
+          # The DB does NOT store artifact file lists—only artifact_uri—so here we just show URIs.
+          run_sql "Artifact URIs (latest runs)" "
+            SELECT
+              run_uuid AS run_id,
+              artifact_uri
             FROM runs
             ORDER BY start_time DESC
             LIMIT 10;
-          " | tail -n +2 | while IFS=',' read -r run_id exp_id status start_time end_time; do
-            echo "| $run_id | $exp_id | $status | $start_time | $end_time |" >> "$GITHUB_STEP_SUMMARY"
-          done
+          "
 
+          # Model registry (optional; present only if you use it)
+          if has_table registered_models; then
+            run_sql "Registered Models" "
+              SELECT
+                name,
+                creation_time,
+                last_updated_time,
+                description
+              FROM registered_models
+              ORDER BY last_updated_time DESC
+              LIMIT 20;
+            "
+          fi
+
+          if has_table model_versions; then
+            run_sql "Model Versions" "
+              SELECT
+                name,
+                version,
+                creation_time,
+                last_updated_time,
+                current_stage,
+                status,
+                run_id,
+                source
+              FROM model_versions
+              ORDER BY last_updated_time DESC
+              LIMIT 50;
+            "
+          fi
+
+          echo "---" >> "$GITHUB_STEP_SUMMARY"
+          echo "_Note: MLflow artifacts (files) are not stored in the SQLite DB; only the artifact URI is._" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-
+  
   # ==========================================
   # TESTING & COVERAGE
   # ==========================================
