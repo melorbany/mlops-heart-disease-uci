@@ -1,3 +1,4 @@
+[![CI/CD](https://github.com/melorbany/mlops-heart-disease-uci/actions/workflows/ci_cd.yml/badge.svg)](https://github.com/melorbany/mlops-heart-disease-uci/actions/workflows/ci_cd.yml)
 # MLOps Assignment 1 - Heart Disease Prediction
 
 End-to-end **machine learning + MLOps** pipeline for predicting heart disease using the **UCI Heart Disease (processed) datasets** and serving predictions via a **FastAPI** web service.
