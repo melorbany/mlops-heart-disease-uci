@@ -1,18 +1,11 @@
-"""
-Exploratory Data Analysis (EDA) visualizations for Heart Disease dataset.
-
-Generates:
-- Histograms for all numeric features
-- Correlation heatmap
-- Class balance plot
-
-Saves all plots to artifacts/eda/ directory.
-"""
-
 import argparse
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")  # headless-safe backend; must come before pyplot
+
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 
@@ -30,10 +23,11 @@ def plot_histograms(df: pd.DataFrame, output_dir: Path) -> Path:
     numeric_cols = [col for col in NUMERIC_FEATURES if col in df.columns]
 
     n_cols = 3
-    n_rows = (len(numeric_cols) + n_cols - 1) // n_cols
+    n_rows = max(1, (len(numeric_cols) + n_cols - 1) // n_cols)
 
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows * 4))
-    axes = axes.flatten() if n_rows > 1 else [axes]
+    # Robustly handle axes returned as Axes, 1D ndarray, or 2D ndarray
+    axes = np.array(axes).ravel()
 
     for idx, col in enumerate(numeric_cols):
         axes[idx].hist(df[col].dropna(), bins=30, edgecolor="black", alpha=0.7)
@@ -164,8 +158,10 @@ def generate_eda_summary(df: pd.DataFrame, output_dir: Path) -> Path:
     numeric_cols = [col for col in NUMERIC_FEATURES if col in df.columns]
     for col in numeric_cols:
         stats = df[col].describe()
-        summary_lines.append(f"  {col}: mean={stats['mean']:.2f}, std={stats['std']:.2f}, "
-                            f"min={stats['min']:.2f}, max={stats['max']:.2f}")
+        summary_lines.append(
+            f"  {col}: mean={stats['mean']:.2f}, std={stats['std']:.2f}, "
+            f"min={stats['min']:.2f}, max={stats['max']:.2f}"
+        )
 
     summary_lines.append("")
     summary_lines.append("=" * 60)
