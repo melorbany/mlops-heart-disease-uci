@@ -1,0 +1,229 @@
+  Audit Checklist Table
+
+  | Requirement                     | Expected Evidence (files/commands)         | Found Evidence                                                                | Status  | Fix Plan                                                                              |
+  |---------------------------------|--------------------------------------------|-------------------------------------------------------------------------------|---------|---------------------------------------------------------------------------------------|
+  | 1. EDA + Preprocessing          |                                            |                                                                               |         |                                                                                       |
+  | Handle missing values           | Code in preprocessing                      | src/data/preprocess.py:20-24 (fillna with median/mode)                        | Pass    | None                                                                                  |
+  | Encode categoricals             | Feature pipeline with encoding             | src/features/build_features.py:34-39 (OneHotEncoder)                          | Pass    | None                                                                                  |
+  | Histograms plot                 | EDA script/notebook saving PNG             | NOT FOUND                                                                     | Fail    | Create src/eda/visualize.py with histograms                                           |
+  | Correlation heatmap             | EDA script/notebook saving PNG             | NOT FOUND                                                                     | Fail    | Add correlation heatmap in EDA script                                                 |
+  | Class balance plot              | EDA script/notebook saving PNG             | NOT FOUND                                                                     | Fail    | Add class distribution plot in EDA script                                             |
+  | Save plots as artifacts         | Plots saved to disk                        | Only CM/ROC in artifacts/                                                     | Partial | Save all EDA plots to artifacts/eda/                                                  |
+  | 2. Features + Models            |                                            |                                                                               |         |                                                                                       |
+  | Preprocessing pipeline          | Scaling + encoding with train/infer parity | src/features/build_features.py (Pipeline with StandardScaler + OneHotEncoder) | Pass    | None                                                                                  |
+  | Train ≥2 models                 | LogReg, RF or similar                      | src/models/train_model.py:115-123 (LogReg + RF)                               | Pass    | None                                                                                  |
+  | Tuning documented               | Notes/comments on hyperparams              | Hardcoded params in code, no tuning notes                                     | Partial | Add tuning notes/comments or grid search results                                      |
+  | CV + metrics                    | Accuracy, precision, recall, ROC-AUC       | src/models/train_model.py:177-212 (StratifiedKFold + all metrics)             | Pass    | None                                                                                  |
+  | 3. Experiment Tracking          |                                            |                                                                               |         |                                                                                       |
+  | MLflow tracking                 | MLflow setup                               | src/models/mlflow_utils.py, src/config.py:24-26                               | Pass    | None                                                                                  |
+  | Log params, metrics, artifacts  | Log calls in train code                    | src/models/train_model.py:162-236                                             | Pass    | None                                                                                  |
+  | 4. Packaging + Reproducibility  |                                            |                                                                               |         |                                                                                       |
+  | Save final model                | .pkl or MLflow model                       | src/models/train_model.py:255 (joblib to models/heart_model.pkl)              | Pass    | None                                                                                  |
+  | requirements.txt                | Dependency file exists                     | requirements.txt exists                                                       | Pass    | None                                                                                  |
+  | Inference reuses pipeline       | Same preprocessing                         | src/features/build_features.py used in train + predict                        | Pass    | None                                                                                  |
+  | 5. CI/CD + Tests                |                                            |                                                                               |         |                                                                                       |
+  | Unit tests                      | pytest tests for data + model              | tests/test_preprocess.py, tests/test_train_model.py, etc.                     | Pass    | None                                                                                  |
+  | CI workflow                     | GitHub Actions/Jenkins                     | .github/workflows/ci_cd.yml (comprehensive)                                   | Pass    | None                                                                                  |
+  | Lint + test + train in CI       | Workflow steps                             | Lines 18-93 (lint), 515-660 (test), 255-301 (train)                           | Pass    | None                                                                                  |
+  | Pipeline fails on errors        | Exit codes checked                         | Line 628 (coverage threshold fail), linting with `                            |         | true`                                                                                 |
+  | Workflow artifacts/logs         | Upload artifacts                           | Lines 245-249, 289-300, 647-659                                               | Pass    | None                                                                                  |
+  | 6. Containerized Serving        |                                            |                                                                               |         |                                                                                       |
+  | Dockerized API                  | FastAPI/Flask in Docker                    | docker/Dockerfile, src/api/main.py (FastAPI)                                  | Pass    | None                                                                                  |
+  | POST /predict endpoint          | JSON input → prediction + confidence       | src/api/main.py:50-63                                                         | Pass    | None                                                                                  |
+  | Build + run locally             | Instructions                               | README missing Docker run commands                                            | Partial | Add Docker build/run commands to README                                               |
+  | Sample payload + curl           | Example in README/docs                     | NOT FOUND                                                                     | Fail    | Add sample curl command to README                                                     |
+  | 7. Deployment                   |                                            |                                                                               |         |                                                                                       |
+  | Cloud/k8s deployment            | Deploy to GKE/EKS/etc                      | .github/workflows/ci_cd.yml:815-909 (SSH to cloud VM)                         | Pass    | None                                                                                  |
+  | k8s manifests or Helm           | k8s/ or helm/ directory                    | NOT FOUND                                                                     | Fail    | Create k8s/deployment.yaml, k8s/service.yaml                                          |
+  | LoadBalancer/Ingress            | Service exposure                           | Cloud VM with port 80 exposed                                                 | Partial | Add k8s Service manifest with LoadBalancer                                            |
+  | Verify + screenshots            | Proof of deployment                        | NOT FOUND                                                                     | Fail    | Create screenshots/ with deployment proof                                             |
+  | 8. Monitoring + Logging         |                                            |                                                                               |         |                                                                                       |
+  | Log API requests                | Request logging                            | src/api/main.py:33-42 (middleware logging)                                    | Pass    | None                                                                                  |
+  | Prometheus+Grafana OR dashboard | Monitoring stack                           | /metrics endpoint (line 66-69), NO Prom/Grafana                               | Partial | Add Prometheus scraping config + Grafana dashboard OR document metrics endpoint usage |
+  | Proof (screenshots/notes)       | Evidence of monitoring                     | NOT FOUND                                                                     | Fail    | Add monitoring screenshots to screenshots/                                            |
+  | 9. Documentation                |                                            |                                                                               |         |                                                                                       |
+  | Setup instructions              | In README/report                           | README.md exists but incomplete                                               | Partial | Expand README with setup steps                                                        |
+  | EDA/model choices               | In report                                  | NOT FOUND                                                                     | Fail    | Create docs/report.md with EDA findings + model rationale                             |
+  | MLflow summary                  | In report                                  | NOT FOUND                                                                     | Fail    | Add MLflow summary section to report                                                  |
+  | Architecture diagram            | Diagram file                               | NOT FOUND                                                                     | Fail    | Create docs/architecture.png or .drawio                                               |
+  | CI/CD + deploy screenshots      | Screenshots                                | NOT FOUND                                                                     | Fail    | Add CI/CD screenshots to screenshots/                                                 |
+  | Repo link                       | In report                                  | README has GitHub badge                                                       | Pass    | None                                                                                  |
+  | 10-page report                  | doc/docx/pdf file                          | NOT FOUND                                                                     | Fail    | Create docs/report.pdf or .docx                                                       |
+
+  ---
+  Summary Statistics
+
+  - Pass: 17/32 requirements (53%)
+  - Partial: 6/32 requirements (19%)
+  - Fail: 9/32 requirements (28%)
+
+  ---
+  Proposed Commits (Priority Order)
+
+  Priority 1: Critical Gaps (Blocking Acceptance Criteria)
+
+  Commit 1: Add EDA visualization script with required plots
+  # Create new file: src/eda/visualize.py
+  # - Generate histograms for all numeric features
+  # - Generate correlation heatmap
+  # - Generate class balance plot
+  # - Save all plots to artifacts/eda/
+  # Run: python -m src.eda.visualize
+  Files to create:
+  - src/eda/__init__.py
+  - src/eda/visualize.py
+
+  Expected outputs: artifacts/eda/histograms.png, artifacts/eda/correlation_heatmap.png, artifacts/eda/class_balance.png
+
+  ---
+  Commit 2: Add Kubernetes manifests for deployment
+  # Create k8s directory with deployment and service manifests
+  Files to create:
+  - k8s/deployment.yaml (Deployment with image from DockerHub)
+  - k8s/service.yaml (LoadBalancer service exposing port 80)
+  - k8s/README.md (Instructions for kubectl apply -f k8s/)
+
+  ---
+  Commit 3: Create comprehensive documentation report
+  # Create docs/report.md with all required sections
+  File to create: docs/report.md (Markdown version, can be converted to PDF later)
+
+  Sections to include:
+  - Setup instructions (dependencies, data download, training, API)
+  - EDA summary (findings from visualizations)
+  - Model selection rationale (why LogReg + RF, hyperparameter choices)
+  - MLflow experiment summary (runs, metrics comparison)
+  - Architecture diagram (text description or ASCII art initially)
+  - CI/CD workflow explanation
+  - Deployment process
+  - Monitoring approach
+
+  ---
+  Commit 4: Add deployment and monitoring screenshots
+  # Create screenshots directory with proof of deployment
+  Files to create:
+  - screenshots/ci_cd_pipeline.png (GitHub Actions workflow success)
+  - screenshots/mlflow_ui.png (MLflow experiments dashboard)
+  - screenshots/api_swagger.png (FastAPI Swagger UI)
+  - screenshots/api_predict_test.png (Curl or Postman request/response)
+  - screenshots/cloud_deployment.png (Cloud VM or k8s pods running)
+  - screenshots/metrics_endpoint.png (API metrics output)
+
+  Command to capture:
+  # For API screenshots, run:
+  curl http://YOUR_CLOUD_HOST/health
+  curl -X POST http://YOUR_CLOUD_HOST/predict -H "Content-Type: application/json" \
+    -d '{"age": 63, "sex": 1, "cp": 3, "trestbps": 145, "chol": 233, "fbs": 1, "restecg": 0, "thalach": 150, "exang": 0, "oldpeak": 2.3, "slope": 0, "ca": 0, "thal": 1}'
+
+  ---
+  Priority 2: Improving Existing Implementation
+
+  Commit 5: Enhance README with Docker and sample curl commands
+  # Update README.md
+  Additions needed:
+  1. Docker build command: docker build -f docker/Dockerfile -t heart-predict-api .
+  2. Docker run command: docker run -d -p 8000:8000 heart-predict-api
+  3. Sample curl command (see Commit 4)
+  4. Expected response format
+
+  ---
+  Commit 6: Add Prometheus monitoring configuration
+  # Add Prometheus + Grafana configs (optional but recommended)
+  Files to create (if pursuing full monitoring):
+  - monitoring/prometheus.yml (scrape config for /metrics endpoint)
+  - monitoring/grafana-dashboard.json (simple dashboard)
+  - monitoring/docker-compose.yml (to run Prom + Grafana locally)
+
+  Alternative (lighter): Document existing /metrics endpoint in README and show sample output in screenshots.
+
+  ---
+  Commit 7: Make linting errors fail the CI pipeline
+  # Edit .github/workflows/ci_cd.yml
+  # Remove `|| true` from flake8, pylint, black, isort commands
+  Changes:
+  - Line 49: Remove || true from flake8
+  - Line 64: Remove || true from pylint
+  - Line 74: Remove || true from black
+  - Line 87: Remove || true from isort
+
+  ---
+  Commit 8: Add hyperparameter tuning documentation
+  # Add comments or notes in src/models/train_model.py
+  # OR create docs/hyperparameter_tuning.md
+  Content: Document why specific hyperparameters were chosen (e.g., max_iter=1000, n_estimators=200), or add grid search results if tuning was performed.
+
+  ---
+  Verification Commands
+
+  To verify the fixes work correctly, run:
+
+  # 1. Install dependencies
+  pip install -r requirements.txt
+
+  # 2. Run EDA (after Commit 1)
+  python -m src.eda.visualize
+  ls artifacts/eda/  # Should see histogram, heatmap, class_balance plots
+
+  # 3. Run full CI/CD locally (simulate)
+  python -m src.data.download_data
+  python -m src.data.convert_uci_to_csv
+  python -m src.data.preprocess
+  python -m src.models.train_model
+  pytest tests/ -v --cov=src
+
+  # 4. Build and run Docker
+  docker build -f docker/Dockerfile -t heart-predict-api .
+  docker run -d -p 8000:8000 --name test-api heart-predict-api
+  curl http://localhost:8000/health
+  curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" \
+    -d '{"age": 63, "sex": 1, "cp": 3, "trestbps": 145, "chol": 233, "fbs": 1, "restecg": 0, "thalach": 150, "exang": 0, "oldpeak": 2.3, "slope": 0, "ca": 0, "thal": 1}'
+  docker stop test-api && docker rm test-api
+
+  # 5. Deploy to k8s (after Commit 2)
+  kubectl apply -f k8s/
+  kubectl get pods
+  kubectl get svc
+  # Test LoadBalancer endpoint
+
+  # 6. Check MLflow UI
+  mlflow ui --backend-store-uri sqlite:///mlflow/mlflow.db
+  # Open http://localhost:5000
+
+  ---
+  Implementation Sequence Recommendation
+
+  Execute commits in this order for fastest time-to-compliance:
+
+  1. Commit 1 (EDA) - ~1 hour - Unblocks requirement #1
+  2. Commit 5 (README) - ~30 minutes - Improves usability
+  3. Commit 3 (Documentation) - ~2 hours - Major deliverable
+  4. Commit 4 (Screenshots) - ~1 hour - Proof of work
+  5. Commit 2 (k8s) - ~1 hour - Deployment requirement
+  6. Commit 7 (Linting) - ~15 minutes - CI strictness
+  7. Commit 6 (Monitoring) - ~1-2 hours OR 15 min for lightweight docs
+  8. Commit 8 (Tuning docs) - ~30 minutes - Nice-to-have
+
+  Total estimated effort: 6-8 hours to close all critical gaps.
+
+● ---
+  Key Findings
+
+  Strong Points:
+  - Solid CI/CD pipeline with comprehensive stages (lint, security, test, train, docker, deploy)
+  - Good MLflow integration with proper experiment tracking
+  - Well-structured code with separation of concerns
+  - Comprehensive tests with coverage tracking
+  - Functional cloud deployment via GitHub Actions
+  - API is production-ready with logging and health checks
+
+  Critical Gaps:
+  1. No EDA visualizations - Missing histograms, heatmap, class balance plots
+  2. No k8s manifests - Deployment exists but no k8s/Helm files
+  3. No documentation report - Missing the required 10-page report
+  4. No screenshots - No proof of deployment/monitoring
+  5. Incomplete monitoring - Has /metrics endpoint but no Prometheus/Grafana or documentation
+
+  Next Steps:
+  Follow the 8 proposed commits in priority order. The first 4 commits address critical blocking issues and should be completed first. The remaining 4 commits improve code quality and documentation.
+
+  All code changes should maintain the existing high-quality patterns already established in the repository.
