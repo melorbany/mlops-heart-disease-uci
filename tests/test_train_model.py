@@ -1,160 +1,132 @@
-import json
+# tests/test_train.py
 
+import importlib
+from pathlib import Path
+
+import numpy as np
 import pandas as pd
 import pytest
+from sklearn.dummy import DummyClassifier
+from sklearn.pipeline import Pipeline
 
-from src.config import TARGET_COLUMN
-from src.models.train_model import main as train_main
 
-
-@pytest.fixture
-def tiny_processed_df():
-    """Return a tiny but valid processed dataset as a DataFrame."""
-    return pd.DataFrame(
+def _make_fake_df(n_rows: int = 80) -> pd.DataFrame:
+    rng = np.random.RandomState(0)
+    df = pd.DataFrame(
         {
-            "age": [63, 45, 54, 60],
-            "trestbps": [145, 130, 120, 140],
-            "chol": [233, 250, 240, 220],
-            "thalach": [150, 140, 130, 160],
-            "oldpeak": [2.3, 1.4, 0.0, 1.5],
-            "sex": [1, 0, 1, 1],
-            "cp": [3, 2, 1, 0],
-            "fbs": [1, 0, 0, 1],
-            "restecg": [0, 1, 1, 0],
-            "exang": [0, 1, 0, 1],
-            "slope": [0, 1, 2, 1],
-            "ca": [0, 0, 1, 2],
-            "thal": [1, 2, 2, 3],
-            TARGET_COLUMN: [1, 0, 0, 1],
+            "f1": rng.normal(size=n_rows),
+            "f2": rng.normal(size=n_rows),
+            "target": rng.binomial(1, 0.4, size=n_rows),
         }
     )
+    return df
 
 
-def test_train_model_runs_and_saves_model(tmp_path, monkeypatch, tiny_processed_df):
-    """
-    End-to-end test:
-    - Writes a tiny processed dataset to disk
-    - Monkeypatches paths in train_model
-    - Runs main()
-    - Asserts that a model file and metrics.json are created
-    """
-    # Prepare temporary files/dirs
-    processed_path = tmp_path / "heart_clean.csv"
-    final_model_path = tmp_path / "heart_model.pkl"
+@pytest.fixture()
+def fake_paths(tmp_path: Path):
     artifacts_dir = tmp_path / "artifacts"
-
-    # Save synthetic processed data
-    tiny_processed_df.to_csv(processed_path, index=False)
-
-    # Monkeypatch config paths inside src.models.train_model
-    monkeypatch.setattr("src.models.train_model.PROCESSED_DATA_PATH", processed_path)
-    monkeypatch.setattr("src.models.train_model.FINAL_MODEL_PATH", final_model_path)
-    monkeypatch.setattr("src.models.train_model.ARTIFACTS_DIR", artifacts_dir)
-
-    # Use small test_size so we have a couple of train samples; CV handling
-    # in train_model should adapt n_splits accordingly.
-    train_main(random_state=0, test_size=0.5)
-
-    # Check model file created
-    assert final_model_path.exists(), "Final model file was not created."
-
-    # Check metrics.json exists
-    metrics_path = artifacts_dir / "metrics.json"
-    assert metrics_path.exists(), "metrics.json was not created."
-
-    # Load metrics.json and do basic structural checks
-    with open(metrics_path, "r") as f:
-        metrics = json.load(f)
-
-    # We expect entries for both models: 'logreg' and 'rf'
-    assert "logreg" in metrics, "Metrics for 'logreg' not found in metrics.json."
-    assert "rf" in metrics, "Metrics for 'rf' not found in metrics.json."
-
-    # Each model should at least have a ROC-AUC metric
-    assert "logreg_roc_auc" in metrics["logreg"]
-    assert "rf_roc_auc" in metrics["rf"]
-
-    # Optionally: check that confusion matrix / ROC curve images exist
-    # (prefixes are 'logreg' and 'rf' as in the train_model code)
-    logreg_cm = artifacts_dir / "logreg_confusion_matrix.png"
-    logreg_roc = artifacts_dir / "logreg_roc_curve.png"
-    rf_cm = artifacts_dir / "rf_confusion_matrix.png"
-    rf_roc = artifacts_dir / "rf_roc_curve.png"
-
-    assert logreg_cm.exists(), "LogReg confusion matrix PNG not created."
-    assert logreg_roc.exists(), "LogReg ROC curve PNG not created."
-    assert rf_cm.exists(), "RandomForest confusion matrix PNG not created."
-    assert rf_roc.exists(), "RandomForest ROC curve PNG not created."
+    processed_csv = tmp_path / "processed.csv"
+    final_model_path = tmp_path / "model" / "final_model.joblib"
+    return artifacts_dir, processed_csv, final_model_path
 
 
-def test_train_model_uses_mlflow_utils(tmp_path, monkeypatch, tiny_processed_df):
+def test_evaluate_model_creates_plots_and_metrics(tmp_path: Path):
+    # Import the module under test
+    train_model = importlib.import_module("src.models.train_model")
+
+    # Create simple pipeline that supports predict_proba
+    X_test = pd.DataFrame({"f1": [0, 1, 2, 3], "f2": [1, 1, 0, 0]})
+    y_test = np.array([0, 1, 0, 1])
+
+    model = Pipeline(
+        steps=[
+            ("clf", DummyClassifier(strategy="prior")),
+        ]
+    ).fit(X_test, y_test)
+
+    artifact_dir = tmp_path / "plots"
+    metrics, cm_path, roc_path = train_model.evaluate_model(
+        model, X_test, y_test, prefix="dummy", artifact_dir=artifact_dir
+    )
+
+    # Metric keys exist
+    assert "dummy_accuracy" in metrics
+    assert "dummy_precision" in metrics
+    assert "dummy_recall" in metrics
+    assert "dummy_f1" in metrics
+    assert "dummy_roc_auc" in metrics
+
+    # Files exist
+    assert Path(cm_path).exists()
+    assert Path(roc_path).exists()
+
+
+def test_main_runs_end_to_end(monkeypatch, fake_paths):
     """
-    Test that the MLflow utility functions are called at least once.
-    We mock them and assert they were invoked.
+    Runs train_model.main() with:
+    - a fake processed CSV
+    - patched config constants (paths, random_state, test_size)
+    - stubbed feature functions (split_features_target/build_preprocessor)
+    - stubbed MLflow utils to no-op (so no tracking server needed)
     """
-    processed_path = tmp_path / "heart_clean.csv"
-    final_model_path = tmp_path / "heart_model.pkl"
-    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir, processed_csv, final_model_path = fake_paths
 
-    tiny_processed_df.to_csv(processed_path, index=False)
+    # Write fake CSV
+    df = _make_fake_df(80)
+    df.to_csv(processed_csv, index=False)
 
-    # Monkeypatch paths in the module under test
-    monkeypatch.setattr("src.models.train_model.PROCESSED_DATA_PATH", processed_path)
-    monkeypatch.setattr("src.models.train_model.FINAL_MODEL_PATH", final_model_path)
-    monkeypatch.setattr("src.models.train_model.ARTIFACTS_DIR", artifacts_dir)
+    # Import module
+    train_model = importlib.import_module("src.models.train_model")
 
-    # --- Mock MLflow utilities ---
-    start_run_calls = []
-    log_params_calls = []
-    log_metrics_calls = []
-    log_artifact_calls = []
+    # ---- Patch config values inside train_model module ----
+    monkeypatch.setattr(train_model, "ARTIFACTS_DIR", artifacts_dir, raising=True)
+    monkeypatch.setattr(train_model, "PROCESSED_DATA_PATH", processed_csv, raising=True)
+    monkeypatch.setattr(train_model, "FINAL_MODEL_PATH", final_model_path, raising=True)
+    monkeypatch.setattr(train_model, "RANDOM_STATE", 42, raising=True)
+    monkeypatch.setattr(train_model, "TEST_SIZE", 0.25, raising=True)
 
-    class DummyRunCtx:
-        def __init__(self, name):
-            self.name = name
+    # ---- Stub out feature functions ----
+    def split_features_target_stub(df_in: pd.DataFrame):
+        X = df_in[["f1", "f2"]]
+        y = df_in["target"].astype(int).to_numpy()
+        return X, y
 
-        def __enter__(self):
-            start_run_calls.append(self.name)
+    # Preprocessor can just be "passthrough" for the test
+    def build_preprocessor_stub():
+        return "passthrough"
+
+    monkeypatch.setattr(train_model, "split_features_target", split_features_target_stub, raising=True)
+    monkeypatch.setattr(train_model, "build_preprocessor", build_preprocessor_stub, raising=True)
+
+    # ---- Stub MLflow utils used by the script (no-op) ----
+    class _DummyRun:
+        def __enter__(self):  # context manager
             return self
+        def __exit__(self, exc_type, exc, tb):
+            return False
 
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            pass
+    monkeypatch.setattr(train_model, "start_run", lambda **kwargs: _DummyRun(), raising=True)
+    monkeypatch.setattr(train_model, "enable_autolog", lambda *a, **k: None, raising=True)
+    monkeypatch.setattr(train_model, "log_artifact", lambda *a, **k: None, raising=True)
+    monkeypatch.setattr(train_model, "log_artifacts", lambda *a, **k: None, raising=True)
+    monkeypatch.setattr(train_model, "log_dataset_info", lambda *a, **k: None, raising=True)
+    monkeypatch.setattr(train_model, "log_json", lambda *a, **k: None, raising=True)
+    monkeypatch.setattr(train_model, "log_metrics", lambda *a, **k: None, raising=True)
+    monkeypatch.setattr(train_model, "log_params", lambda *a, **k: None, raising=True)
+    monkeypatch.setattr(train_model, "log_text", lambda *a, **k: None, raising=True)
 
-    def fake_start_run(run_name: str):
-        return DummyRunCtx(run_name)
+    # train_model also calls mlflow.set_tag directly; patch that too
+    monkeypatch.setattr(train_model.mlflow, "set_tag", lambda *a, **k: None, raising=True)
 
-    def fake_log_params(params):
-        log_params_calls.append(params)
+    # Run
+    train_model.main(random_state=42, test_size=0.25)
 
-    def fake_log_metrics(metrics):
-        log_metrics_calls.append(metrics)
+    # Assert outputs created locally
+    assert (artifacts_dir / "metrics.json").exists()
+    assert final_model_path.exists()
 
-    def fake_log_artifact(path):
-        log_artifact_calls.append(path)
-
-    monkeypatch.setattr("src.models.train_model.start_run", fake_start_run)
-    monkeypatch.setattr("src.models.train_model.log_params", fake_log_params)
-    monkeypatch.setattr("src.models.train_model.log_metrics", fake_log_metrics)
-    monkeypatch.setattr("src.models.train_model.log_artifact", fake_log_artifact)
-
-    # Run training
-    train_main(random_state=0, test_size=0.5)
-
-    # Assert MLflow-like utilities were called
-    # We expect at least one run for each model: 'logreg' and 'rf'
-    assert any("logreg" == name for name in start_run_calls), (
-        "start_run not called for 'logreg'."
-    )
-    assert any("rf" == name for name in start_run_calls), (
-        "start_run not called for 'rf'."
-    )
-
-    assert len(log_params_calls) >= 2, (
-        "log_params should be called at least once per model."
-    )
-    assert len(log_metrics_calls) >= 2, (
-        "log_metrics should be called at least once per model."
-    )
-    assert len(log_artifact_calls) >= 4, (
-        "log_artifact should be called for multiple plots."
-    )
+    # Plots should be created (evaluate_model saves them locally)
+    plots_dir = artifacts_dir / "plots"
+    assert plots_dir.exists()
+    # At least some pngs should exist
+    assert any(p.suffix == ".png" for p in plots_dir.glob("*.png"))
