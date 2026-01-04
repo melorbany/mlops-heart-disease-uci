@@ -636,14 +636,14 @@ jobs:
           echo "_Note: MLflow artifacts (files) are not stored in the SQLite DB; only the artifact URI is._" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"  
 
-  # ==========================================
+# ==========================================
   # TESTING & COVERAGE
   # ==========================================
   test:
     name: Tests & Coverage
     runs-on: ubuntu-latest
     needs: train-model
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -658,7 +658,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+          cache: pip
 
       - name: Install dependencies
         run: |
@@ -675,11 +675,13 @@ jobs:
 
       - name: Run Unit Tests with Coverage
         id: unit-tests
+        shell: bash
         run: |
+          set -o pipefail
+
           echo "### 1. Test Execution" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
 
-          # Run tests with coverage
           pytest tests/ \
             -v \
             --cov=src \
@@ -694,7 +696,6 @@ jobs:
             --tb=short \
             -n auto 2>&1 | tee test-output.txt
 
-          # Tail key lines into the summary
           tail -30 test-output.txt | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
 
           echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
@@ -702,6 +703,7 @@ jobs:
 
       - name: Generate Coverage Report
         if: always()
+        shell: bash
         run: |
           echo "### 2. Code Coverage Report" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
           echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
@@ -712,21 +714,17 @@ jobs:
             echo "**Total Coverage:** ${COVERAGE}%" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
             echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
 
-            # Detailed coverage report
             echo "#### 2.1 Detailed Coverage by Module" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
             echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
             coverage report --skip-covered >> coverage-report.txt 2>/dev/null || echo "Coverage report not available" >> coverage-report.txt
-
             cat coverage-report.txt | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
             echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
             echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
 
-            # Missing coverage
             echo "#### 2.2 Files with Missing Coverage" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
             echo '```' | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
             coverage report --skip-covered --show-missing > coverage-missing.txt 2>/dev/null || echo "Coverage report not available" > coverage-missing.txt
 
-            # Filter out fully covered files, if any
             if grep -v "100%" coverage-missing.txt > coverage-missing-filtered.txt 2>/dev/null && [ -s coverage-missing-filtered.txt ]; then
               cat coverage-missing-filtered.txt | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
             else
@@ -740,6 +738,7 @@ jobs:
           fi
 
       - name: Check Coverage Threshold
+        shell: bash
         run: |
           echo "### 3. Coverage Threshold Check" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
           echo "" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
@@ -770,7 +769,6 @@ jobs:
           echo "---" | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
           echo "All tests passed and coverage meets the required threshold." | tee -a test-summary.txt >> "$GITHUB_STEP_SUMMARY"
 
-      # Single artifact with tests + coverage outputs
       - name: Upload test and coverage artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -784,7 +782,7 @@ jobs:
             htmlcov/
             test-report.html
           compression-level: 6
-
+          
   # ==========================================
   # VALIDATE MODEL
   # ==========================================
