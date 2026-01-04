@@ -248,7 +248,6 @@ jobs:
           path: data/processed/heart_clean.csv
           if-no-files-found: error
 
-
   # ==========================================
   # EDA VISUALIZATIONS
   # ==========================================
@@ -265,7 +264,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+          cache: pip
 
       - name: Install dependencies
         run: |
@@ -280,39 +279,41 @@ jobs:
 
       - name: Run EDA and generate visualizations
         run: |
+          set -euo pipefail
           echo "Running: python -m src.eda.visualize"
           python -m src.eda.visualize
 
       - name: Verify EDA outputs
         run: |
+          set -euo pipefail
           echo "Checking EDA artifacts..."
-          ls -lh artifacts/eda/
+          ls -lah artifacts/eda || true
 
-          if [ ! -f "artifacts/eda/histograms.png" ]; then
-            echo "ERROR: histograms.png not found"
-            exit 1
-          fi
-
-          if [ ! -f "artifacts/eda/correlation_heatmap.png" ]; then
-            echo "ERROR: correlation_heatmap.png not found"
-            exit 1
-          fi
-
-          if [ ! -f "artifacts/eda/class_balance.png" ]; then
-            echo "ERROR: class_balance.png not found"
-            exit 1
-          fi
+          test -f "artifacts/eda/histograms.png" || (echo "ERROR: histograms.png not found" && exit 1)
+          test -f "artifacts/eda/correlation_heatmap.png" || (echo "ERROR: correlation_heatmap.png not found" && exit 1)
+          test -f "artifacts/eda/class_balance.png" || (echo "ERROR: class_balance.png not found" && exit 1)
 
           echo "All EDA plots generated successfully"
 
       - name: Display EDA visualizations in workflow summary
+        shell: bash
         run: |
+          set -euo pipefail
+
           echo "## Exploratory Data Analysis (EDA)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Automated EDA visualizations generated from the processed dataset." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
-          # Function to convert image to base64 and add to summary
+          # Portable base64 (ubuntu supports -w; mac uses -b)
+          b64() {
+            if base64 --help 2>/dev/null | grep -q -- "-w"; then
+              base64 -w 0 "$1"
+            else
+              base64 -b 0 "$1"
+            fi
+          }
+
           add_image_to_summary() {
             local title="$1"
             local image_path="$2"
@@ -320,36 +321,43 @@ jobs:
             echo "### $title" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
 
-            if [ -f "$image_path" ]; then
-              # Convert image to base64
-              local base64_image=$(base64 -w 0 "$image_path")
+            if [[ -f "$image_path" ]]; then
               local extension="${image_path##*.}"
-
-              # Determine MIME type
+              local mime_type="image/png"
               case "$extension" in
-                png) mime_type="image/png" ;;
                 jpg|jpeg) mime_type="image/jpeg" ;;
-                *) mime_type="image/png" ;;
+                png) mime_type="image/png" ;;
               esac
 
-              # Add image as base64 data URL
+              # Convert image to base64 and embed as data URL
+              local base64_image
+              base64_image="$(b64 "$image_path")"
+
               echo "<img src=\"data:${mime_type};base64,${base64_image}\" alt=\"$title\" style=\"max-width: 100%; height: auto;\" />" >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "**Status:** Generated successfully" >> "$GITHUB_STEP_SUMMARY"
+              echo "**Status:** Embedded successfully**" >> "$GITHUB_STEP_SUMMARY"
             else
               echo "**Status:** Image not found at \`$image_path\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "**Debug (workspace):**" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              pwd >> "$GITHUB_STEP_SUMMARY"
+              ls -lah >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              ls -lah artifacts || true >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              ls -lah artifacts/eda || true >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
             fi
 
             echo "" >> "$GITHUB_STEP_SUMMARY"
           }
 
-          # Add all EDA visualizations
           add_image_to_summary "1. Class Balance Distribution" "artifacts/eda/class_balance.png"
           add_image_to_summary "2. Feature Correlation Heatmap" "artifacts/eda/correlation_heatmap.png"
           add_image_to_summary "3. Numeric Features Histograms" "artifacts/eda/histograms.png"
 
-          # Add EDA summary text if available
-          if [ -f "artifacts/eda/eda_summary.txt" ]; then
+          if [[ -f "artifacts/eda/eda_summary.txt" ]]; then
             echo "### EDA Summary" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -367,7 +375,6 @@ jobs:
           name: eda-visualizations
           path: artifacts/eda/
           if-no-files-found: error
-
 
   # ==========================================
   # TRAIN MODEL
