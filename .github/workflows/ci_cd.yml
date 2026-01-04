@@ -250,6 +250,126 @@ jobs:
 
 
   # ==========================================
+  # EDA VISUALIZATIONS
+  # ==========================================
+  eda:
+    name: EDA Visualizations
+    runs-on: ubuntu-latest
+    needs: data
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download processed dataset artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: processed-data
+          path: data/processed
+
+      - name: Run EDA and generate visualizations
+        run: |
+          echo "Running: python -m src.eda.visualize"
+          python -m src.eda.visualize
+
+      - name: Verify EDA outputs
+        run: |
+          echo "Checking EDA artifacts..."
+          ls -lh artifacts/eda/
+
+          if [ ! -f "artifacts/eda/histograms.png" ]; then
+            echo "ERROR: histograms.png not found"
+            exit 1
+          fi
+
+          if [ ! -f "artifacts/eda/correlation_heatmap.png" ]; then
+            echo "ERROR: correlation_heatmap.png not found"
+            exit 1
+          fi
+
+          if [ ! -f "artifacts/eda/class_balance.png" ]; then
+            echo "ERROR: class_balance.png not found"
+            exit 1
+          fi
+
+          echo "All EDA plots generated successfully"
+
+      - name: Display EDA visualizations in workflow summary
+        run: |
+          echo "## Exploratory Data Analysis (EDA)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Automated EDA visualizations generated from the processed dataset." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # Function to convert image to base64 and add to summary
+          add_image_to_summary() {
+            local title="$1"
+            local image_path="$2"
+
+            echo "### $title" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+
+            if [ -f "$image_path" ]; then
+              # Convert image to base64
+              local base64_image=$(base64 -w 0 "$image_path")
+              local extension="${image_path##*.}"
+
+              # Determine MIME type
+              case "$extension" in
+                png) mime_type="image/png" ;;
+                jpg|jpeg) mime_type="image/jpeg" ;;
+                *) mime_type="image/png" ;;
+              esac
+
+              # Add image as base64 data URL
+              echo "<img src=\"data:${mime_type};base64,${base64_image}\" alt=\"$title\" style=\"max-width: 100%; height: auto;\" />" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "**Status:** Generated successfully" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "**Status:** Image not found at \`$image_path\`" >> "$GITHUB_STEP_SUMMARY"
+            fi
+
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          # Add all EDA visualizations
+          add_image_to_summary "1. Class Balance Distribution" "artifacts/eda/class_balance.png"
+          add_image_to_summary "2. Feature Correlation Heatmap" "artifacts/eda/correlation_heatmap.png"
+          add_image_to_summary "3. Numeric Features Histograms" "artifacts/eda/histograms.png"
+
+          # Add EDA summary text if available
+          if [ -f "artifacts/eda/eda_summary.txt" ]; then
+            echo "### EDA Summary" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat artifacts/eda/eda_summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "---" >> "$GITHUB_STEP_SUMMARY"
+          echo "_EDA visualizations help understand data distribution, correlations, and potential issues before model training._" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload EDA artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eda-visualizations
+          path: artifacts/eda/
+          if-no-files-found: error
+
+
+  # ==========================================
   # TRAIN MODEL
   # ==========================================
   train-model:
@@ -689,6 +809,7 @@ jobs:
       - security
       - test
       - validate-model
+      - eda
 
     steps:
       - name: Checkout code
