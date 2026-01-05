@@ -305,15 +305,6 @@ jobs:
           echo "Automated EDA visualizations generated from the processed dataset." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
-          # Portable base64 (ubuntu supports -w; mac uses -b)
-          b64() {
-            if base64 --help 2>/dev/null | grep -q -- "-w"; then
-              base64 -w 0 "$1"
-            else
-              base64 -b 0 "$1"
-            fi
-          }
-
           add_image_to_summary() {
             local title="$1"
             local image_path="$2"
@@ -322,33 +313,29 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
 
             if [[ -f "$image_path" ]]; then
-              local extension="${image_path##*.}"
-              local mime_type="image/png"
-              case "$extension" in
-                jpg|jpeg) mime_type="image/jpeg" ;;
-                png) mime_type="image/png" ;;
-              esac
-
-              # Convert image to base64 and embed as data URL
-              local base64_image
-              base64_image="$(b64 "$image_path")"
-
-              echo "<img src=\"data:${mime_type};base64,${base64_image}\" alt=\"$title\" style=\"max-width: 100%; height: auto;\" />" >> "$GITHUB_STEP_SUMMARY"
+              echo "**Status:** Generated successfully" >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "**Status:** Embedded successfully" >> "$GITHUB_STEP_SUMMARY"
+              echo "📊 View this visualization in the artifacts section below." >> "$GITHUB_STEP_SUMMARY"
             else
               echo "**Status:** Image not found at \`$image_path\`" >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "**Debug (workspace):**" >> "$GITHUB_STEP_SUMMARY"
+              echo "<details><summary>Debug Information</summary>" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
+              echo "Current directory:" >> "$GITHUB_STEP_SUMMARY"
               pwd >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "Files in current directory:" >> "$GITHUB_STEP_SUMMARY"
               ls -lah >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "Files in artifacts:" >> "$GITHUB_STEP_SUMMARY"
               ls -lah artifacts 2>&1 >> "$GITHUB_STEP_SUMMARY" || true
               echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "Files in artifacts/eda:" >> "$GITHUB_STEP_SUMMARY"
               ls -lah artifacts/eda 2>&1 >> "$GITHUB_STEP_SUMMARY" || true
               echo '```' >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "</details>" >> "$GITHUB_STEP_SUMMARY"
             fi
 
             echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -368,15 +355,21 @@ jobs:
           fi
 
           echo "---" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Download Visualizations" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "All EDA visualizations are available as workflow artifacts. Scroll to the bottom of this page to the **Artifacts** section and download **eda-visualizations**." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "_EDA visualizations help understand data distribution, correlations, and potential issues before model training._" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload EDA artifacts
+      - name: Upload EDA visualizations
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: eda-visualizations
-          path: artifacts/eda/
-          if-no-files-found: error
-
+          path: artifacts/eda/*.png
+          retention-days: 30
+          
   # ==========================================
   # TRAIN MODEL
   # ==========================================
