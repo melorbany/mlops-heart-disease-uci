@@ -335,18 +335,19 @@ jobs:
 
               echo "<img src=\"data:${mime_type};base64,${base64_image}\" alt=\"$title\" style=\"max-width: 100%; height: auto;\" />" >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "**Status:** Embedded successfully**" >> "$GITHUB_STEP_SUMMARY"
+              echo "**Status:** Embedded successfully" >> "$GITHUB_STEP_SUMMARY"
             else
               echo "**Status:** Image not found at \`$image_path\`" >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "**Debug (workspace):**" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               pwd >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
               ls -lah >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              ls -lah artifacts || true >> "$GITHUB_STEP_SUMMARY"
+              ls -lah artifacts 2>&1 >> "$GITHUB_STEP_SUMMARY" || true
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              ls -lah artifacts/eda || true >> "$GITHUB_STEP_SUMMARY"
+              ls -lah artifacts/eda 2>&1 >> "$GITHUB_STEP_SUMMARY" || true
               echo '```' >> "$GITHUB_STEP_SUMMARY"
             fi
 
