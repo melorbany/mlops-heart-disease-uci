@@ -1276,3 +1276,86 @@ jobs:
             echo "[PASS] API correctly rejected invalid data"
             cat error_response.json | jq '.' || cat error_response.json
           fi
+  # ==========================================
+  # MONITORING METRICES
+  # ==========================================
+  monitoring-metrices:
+    name: Monitoring Metrices
+    runs-on: ubuntu-latest
+    needs: predict-api
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Install curl and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl jq
+
+      - name: Fetch /metrics and write to GitHub Actions Summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          METRICS_URL="http://${{ secrets.CLOUD_HOST }}/metrics"
+          echo "Fetching metrics from: $METRICS_URL"
+
+          HTTP_STATUS=$(curl -s -o metrics_response.json -w "%{http_code}" \
+            -H "accept: application/json" \
+            "$METRICS_URL")
+
+          echo "HTTP Status Code: $HTTP_STATUS"
+
+          echo "## Monitoring Metrices" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Endpoint:** \`$METRICS_URL\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "**Status:** Failed (HTTP $HTTP_STATUS)" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Response" >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat metrics_response.json >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "**Status:** Success (HTTP 200)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # Pretty print full JSON
+          echo "### Raw Metrics (JSON)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat metrics_response.json | jq '.' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # Render a small table if expected keys exist
+          if jq -e 'has("total_requests") and has("total_predictions") and has("positive_predictions") and has("negative_predictions")' metrics_response.json >/dev/null; then
+            TOTAL_REQUESTS=$(jq -r '.total_requests' metrics_response.json)
+            TOTAL_PREDICTIONS=$(jq -r '.total_predictions' metrics_response.json)
+            POS=$(jq -r '.positive_predictions' metrics_response.json)
+            NEG=$(jq -r '.negative_predictions' metrics_response.json)
+
+            echo "### Key Metrics" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|---|---:|" >> "$GITHUB_STEP_SUMMARY"
+            echo "| total_requests | $TOTAL_REQUESTS |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| total_predictions | $TOTAL_PREDICTIONS |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| positive_predictions | $POS |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| negative_predictions | $NEG |" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "_Note: Expected keys not found; showing raw JSON only._" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload metrics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-metrices
+          path: metrics_response.json
+          if-no-files-found: error
+          retention-days: 30
